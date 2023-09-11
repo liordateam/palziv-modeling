@@ -1,0 +1,25 @@
+config {
+  type: "view", 
+}
+
+CREATE VIEW `palziv-data-prod.presentation.dim_date` AS (
+SELECT
+  date,
+  date_key,
+  year,
+  year_week,
+  year_day,
+  fiscal_year,
+  fiscal_qtr,
+  month,
+  month_name,
+  week_day,
+  day_name,
+  year_month,
+  year_month_number,
+  year_quarter_number,
+  day_is_weekday,
+  today
+FROM
+  `palziv-data-prod.modeling.modeling_dim_date`
+)

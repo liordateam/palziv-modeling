@@ -1,0 +1,18 @@
+config {
+  type: "view", 
+}
+
+CREATE VIEW `palziv-data-prod.presentation.dim_customers` AS (
+SELECT
+  customer_db_id,                         -- CustomersToCustomerClassificationKey / SalesKeyTableToCustomersKey
+  customer_id,                            -- Customers.Cust
+  -- 20230907 db_id,                                  -- Customers.DB
+   -- 20230907account_id,                             -- Customers.Account
+  -- 20230907 customer_name,                          -- Cust_#
+  customer_description,                   -- Customer
+  intercompany_sales,                     -- Intercompany_Sales
+  palziv_class,                           -- Customers.PalzivClass / Customers.PalzivClass2
+  -- 20230907 currency_id                             -- Customers.Curreny
+FROM 
+  `palziv-data-prod.modeling.modeling_dim_customers`
+)

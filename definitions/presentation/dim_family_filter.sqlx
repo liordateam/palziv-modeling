@@ -1,0 +1,17 @@
+config {
+  type: "view", 
+}
+
+CREATE VIEW `palziv-data-prod.presentation.dim_family_filter` AS (
+WITH family_filter AS (
+  SELECT 'ON' AS state, 1 AS qv_sales_filter
+  UNION ALL
+  SELECT 'OFF', 0
+  UNION ALL
+  SELECT 'ALL', 1
+  UNION ALL
+  SELECT 'ALL', 0
+)
+SELECT state, qv_sales_filter 
+FROM family_filter
+)

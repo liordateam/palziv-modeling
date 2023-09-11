@@ -1,0 +1,47 @@
+config {
+  type: "view", 
+}
+
+CREATE VIEW `palziv-data-prod.presentation.fact_receipts` AS (
+WITH total_price AS (
+  SELECT
+    invoice_number_db_id,
+    CASE
+      WHEN total_price_nis IS NULL THEN 0
+      ELSE total_price_nis
+    END AS NIS,
+    CASE
+      WHEN total_price_usd IS NULL THEN 0
+      ELSE total_price_usd
+    END AS USD,
+    CASE
+      WHEN total_price_gbp IS NULL THEN 0
+      ELSE total_price_gbp
+    END AS GBP,
+    CASE
+      WHEN total_price_euro IS NULL THEN 0
+      ELSE total_price_euro
+    END AS EUR
+  FROM `palziv-data-prod.modeling.modeling_fact_receipts`
+), 
+total_price_up AS (
+  SELECT 
+    *
+  FROM total_price
+  UNPIVOT (total_price FOR currency_id IN (NIS, USD, GBP, EUR))
+) 
+
+SELECT 
+  receipts.invoice_number_db_id,
+  receipts.customer_db_id,
+  receipts.agent_db_id,
+  receipts.db_id,                                                        -- Receipts.DB
+  receipts.pay_date,                                                     -- Receipts.PayDate
+  receipts.qv_sales_filter,
+  total_price_up.currency_id,
+  total_price_up.total_price,
+FROM 
+  `palziv-data-prod.modeling.modeling_fact_receipts` AS receipts
+JOIN 
+  total_price_up ON receipts.invoice_number_db_id = total_price_up.invoice_number_db_id
+)

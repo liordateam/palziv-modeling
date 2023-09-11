@@ -1,0 +1,186 @@
+config {
+  type: "view", 
+}
+
+CREATE VIEW `palziv-data-prod.presentation.fact_invoices` AS (
+WITH 
+line_total AS (
+  SELECT
+    invoice_number_line_db_id,
+    line_total_nis AS NIS,                                                             
+    line_total_usd AS USD,                                                            
+    line_total_gbp AS GBP,                                                             
+    line_total_euro AS EUR
+  FROM 
+    `palziv-data-prod.modeling.modeling_fact_invoices`   
+), 
+line_total_up AS (
+  SELECT *
+  FROM line_total
+  UNPIVOT(line_total FOR currency_id IN (NIS, USD, GBP,EUR))
+),
+line_std_cost AS (
+  SELECT
+    invoice_number_line_db_id,
+    line_std_cost_nis AS NIS,                                                             
+    line_std_cost_usd AS USD,                                                            
+    line_std_cost_gbp AS GBP,                                                             
+    line_std_cost_euro AS EUR
+  FROM 
+    `palziv-data-prod.modeling.modeling_fact_invoices`   
+),
+line_std_cost_up AS (
+  SELECT *
+  FROM line_std_cost
+  UNPIVOT(line_std_cost FOR currency_id IN (NIS, USD, GBP,EUR))
+),
+p_line_std_cost AS (
+  SELECT
+    invoice_number_line_db_id,
+    p_line_std_cost_nis AS NIS,                                                             
+    p_line_std_cost_usd AS USD,                                                            
+    p_line_std_cost_gbp AS GBP,                                                             
+    p_line_std_cost_euro AS EUR
+  FROM 
+    `palziv-data-prod.modeling.modeling_fact_invoices`   
+),
+p_line_std_cost_up AS (
+  SELECT *
+  FROM p_line_std_cost
+  UNPIVOT(p_line_std_cost FOR currency_id IN (NIS, USD, GBP,EUR))
+),
+profit AS (
+  SELECT
+    invoice_number_line_db_id,
+    profit_nis AS NIS,                                                             
+    profit_usd AS USD,                                                            
+    profit_gbp AS GBP,                                                             
+    profit_euro AS EUR
+  FROM 
+    `palziv-data-prod.modeling.modeling_fact_invoices`   
+),
+profit_up AS (
+  SELECT *
+  FROM profit
+  UNPIVOT(profit FOR currency_id IN (NIS, USD, GBP,EUR))
+),
+unpivot_lines AS (
+  SELECT
+    line_total_up.invoice_number_line_db_id,
+    line_total_up.currency_id,
+    line_total_up.line_total,
+    line_std_cost_up.line_std_cost,
+    p_line_std_cost_up.p_line_std_cost,
+    profit_up.profit
+  FROM 
+    line_total_up
+  JOIN 
+    line_std_cost_up ON line_total_up.invoice_number_line_db_id = line_std_cost_up.invoice_number_line_db_id 
+    AND line_total_up.currency_id = line_std_cost_up.currency_id
+  JOIN 
+    p_line_std_cost_up ON line_total_up.invoice_number_line_db_id = p_line_std_cost_up.invoice_number_line_db_id 
+    AND line_total_up.currency_id = p_line_std_cost_up.currency_id
+  JOIN 
+    profit_up ON line_total_up.invoice_number_line_db_id = profit_up.invoice_number_line_db_id 
+    AND line_total_up.currency_id = profit_up.currency_id 
+),
+unpivot_orders AS (
+  SELECT 
+    -- 20230907 invoices.invoice_db_id,                                              -- Invoice.InvKey
+    invoices.agent_db_id,
+    invoices.invoice_number_db_id,
+    invoices.part_db_id,
+    invoices.customer_db_id,
+    invoices.db_id,                                                      -- Invoices.DB
+    invoices.invoice_number,                                             -- Invoice_#
+    invoices.invoice_date,                                               -- Invoices.Date 
+    -- 20230907 invoices.invoice_id,                                                 -- Invoice.IV
+    invoices.line,                                                       -- Invoices.Row#	
+    unpivot_lines.currency_id,
+    unpivot_lines.line_total,
+    unpivot_lines.line_std_cost,
+    unpivot_lines.p_line_std_cost,
+    CASE
+      WHEN invoices.t_quant = 0 THEN unpivot_lines.line_total
+      ELSE unpivot_lines.line_total / invoices.t_quant
+    END AS line_total_avg,
+    CASE
+      WHEN unpivot_lines.line_total = 0 THEN unpivot_lines.profit
+      ELSE unpivot_lines.profit / unpivot_lines.line_total
+    END AS line_profit_avg,
+    unpivot_lines.profit,
+    invoices.t_quant,                                                    -- Invoices.TQuant
+    invoices.pay_date,                                                   -- Invoices.PayDate
+    invoices.unit_description,                                           -- Invoices.Unit
+    -- 20230907 invoices.english_unit_description,                                   -- Invoices.EUnitDes
+    -- 20230907 invoices.part_non_standard,                                          -- Invoices.PartNonStandard
+    invoices.qv_sales_filter
+  FROM 
+    `palziv-data-prod.modeling.modeling_fact_invoices` AS invoices
+  JOIN 
+    unpivot_lines ON invoices.invoice_number_line_db_id = unpivot_lines.invoice_number_line_db_id
+)
+
+SELECT 
+  -- 20230907 invoice_db_id,                                              -- Invoice.InvKey
+  agent_db_id,
+  invoice_number_db_id,
+  part_db_id,
+  customer_db_id,
+  db_id,                                                      -- Invoices.DB
+  invoice_number,                                             -- Invoice_#
+  invoice_date,                                               -- Invoices.Date 
+  -- 20230907 invoice_id,                                                 -- Invoice.IV
+  line,                                                       -- Invoices.Row#	
+  currency_id,
+  round(line_total, 2) as line_total,
+  round(line_std_cost, 2) as line_std_cost,
+  round(p_line_std_cost, 2) as p_line_std_cost,
+  round(line_total_avg, 2) as line_total_avg,
+  round(line_profit_avg, 2) as line_profit_avg,
+  profit,
+  -- CASE
+  --   WHEN currency_id = 'NIS' THEN CONCAT('₪',FORMAT("%'.2f", line_total)) 
+  --   WHEN currency_id = 'USD' THEN CONCAT('$',FORMAT("%'.2f", line_total)) 
+  --   WHEN currency_id = 'GBP' THEN CONCAT('€',FORMAT("%'.2f", line_total)) 
+  --   WHEN currency_id = 'EUR' THEN CONCAT('£',FORMAT("%'.2f", line_total)) 
+  -- END AS symbol_line_total,
+  CASE
+    WHEN currency_id = 'NIS' THEN CONCAT('₪',FORMAT("%'.f", line_total)) 
+    WHEN currency_id = 'USD' THEN CONCAT('$',FORMAT("%'.f", line_total)) 
+    WHEN currency_id = 'GBP' THEN CONCAT('€',FORMAT("%'.f", line_total)) 
+    WHEN currency_id = 'EUR' THEN CONCAT('£',FORMAT("%'.f", line_total)) 
+  END AS symbol_line_total,
+  CASE
+    WHEN currency_id = 'NIS' THEN CONCAT('₪',FORMAT("%'.f", line_std_cost)) 
+    WHEN currency_id = 'USD' THEN CONCAT('$',FORMAT("%'.f", line_std_cost)) 
+    WHEN currency_id = 'GBP' THEN CONCAT('€',FORMAT("%'.f", line_std_cost)) 
+    WHEN currency_id = 'EUR' THEN CONCAT('£',FORMAT("%'.f", line_std_cost)) 
+  END AS symbol_line_std_cost,
+  CASE
+    WHEN currency_id = 'NIS' THEN CONCAT('₪',FORMAT("%'.f", p_line_std_cost)) 
+    WHEN currency_id = 'USD' THEN CONCAT('$',FORMAT("%'.f", p_line_std_cost)) 
+    WHEN currency_id = 'GBP' THEN CONCAT('€',FORMAT("%'.f", p_line_std_cost)) 
+    WHEN currency_id = 'EUR' THEN CONCAT('£',FORMAT("%'.f", p_line_std_cost)) 
+  END AS symbol_p_line_std_cost,
+  CASE
+    WHEN currency_id = 'NIS' THEN CONCAT('₪',FORMAT("%'.f", profit)) 
+    WHEN currency_id = 'USD' THEN CONCAT('$',FORMAT("%'.f", profit)) 
+    WHEN currency_id = 'GBP' THEN CONCAT('€',FORMAT("%'.f", profit)) 
+    WHEN currency_id = 'EUR' THEN CONCAT('£',FORMAT("%'.f", profit)) 
+  END AS symbol_profit,
+  CASE
+    WHEN currency_id = 'NIS' THEN CONCAT('₪',FORMAT("%'.f", line_total_avg)) 
+    WHEN currency_id = 'USD' THEN CONCAT('$',FORMAT("%'.f", line_total_avg)) 
+    WHEN currency_id = 'GBP' THEN CONCAT('€',FORMAT("%'.f", line_total_avg)) 
+    WHEN currency_id = 'EUR' THEN CONCAT('£',FORMAT("%'.f", line_total_avg)) 
+  END AS symbol_line_total_avg,
+  CONCAT(round(line_profit_avg * 100, 2), '%') AS symbol_line_profit_avg,
+  t_quant,                                                    -- Invoices.TQuant
+  pay_date,                                                   -- Invoices.PayDate
+  unit_description,                                           -- Invoices.Unit
+  -- 20230907 english_unit_description,                                   -- Invoices.EUnitDes
+  -- 20230907 part_non_standard,                                          -- Invoices.PartNonStandard
+  qv_sales_filter
+FROM unpivot_orders
+)

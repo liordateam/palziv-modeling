@@ -1,0 +1,15 @@
+config {
+  type: "view", 
+}
+
+CREATE VIEW `palziv-data-prod.presentation.dim_exchange_rate` AS (
+SELECT
+  euro,
+  usd,
+  cad,
+  ron,
+  mxn,
+  gbp
+FROM
+  `palziv-data-prod.modeling.modeling_dim_exchange_rate`
+)

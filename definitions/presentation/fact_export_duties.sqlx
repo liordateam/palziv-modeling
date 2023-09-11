@@ -1,0 +1,17 @@
+config {
+  type: "view", 
+}
+
+CREATE VIEW `palziv-data-prod.presentation.fact_export_duties` AS (
+SELECT 
+  part_db_id,
+  db_id,
+  import_file_id,
+  import_file_number,
+  part_id,
+  quantity,
+  total_export_price,
+  export_price_per_unit
+FROM
+  `palziv-data-prod.modeling.modeling_fact_export_duties` 
+)

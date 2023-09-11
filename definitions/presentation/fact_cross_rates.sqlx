@@ -1,0 +1,16 @@
+config {
+  type: "view", 
+}
+
+CREATE VIEW `palziv-data-prod.presentation.fact_cross_rates` AS (
+SELECT
+  date,
+  usd,
+  cad,
+  euro,
+  gbp,
+  ron,
+  mxn
+FROM 
+  `palziv-data-prod.modeling.modeling_fact_cross_rates` 
+)

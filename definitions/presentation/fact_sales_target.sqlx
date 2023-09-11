@@ -1,0 +1,47 @@
+config {
+  type: "view", 
+}
+
+CREATE VIEW `palziv-data-prod.presentation.fact_sales_target` AS (
+WITH forcast_sales AS (
+  SELECT
+    sales_key_table_to_sales_target_key, 
+    CASE 
+      WHEN forcast_sales_nis IS NULL THEN 0
+      ELSE forcast_sales_nis
+    END AS NIS,
+    CASE 
+      WHEN forcast_sales_usd IS NULL THEN 0
+      ELSE forcast_sales_usd
+    END AS USD,
+    CASE 
+      WHEN forcast_sales_gbp IS NULL THEN 0
+      ELSE forcast_sales_gbp
+    END AS GBP,
+    CASE 
+      WHEN forcast_sales_eur IS NULL THEN 0
+      ELSE forcast_sales_eur
+    END AS EUR
+  FROM
+    `palziv-data-prod.modeling.modeling_fact_sales_target`
+), forcast_sales_up AS (
+  SELECT *
+  FROM forcast_sales
+  UNPIVOT(forcast_sales FOR currency_id IN (NIS, USD, GBP, EUR))
+)
+SELECT
+  sales_target.sales_target_db_id,
+  sales_target.sales_key_table_to_sales_target_key,
+  sales_target.part_db_id,
+  sales_target.customer_db_id,
+  sales_target.agent_db_id,
+  sales_target.db_id,
+  sales_target.full_date,
+  sales_target.qv_sales_filter,
+  forcast_sales_up.currency_id,
+  forcast_sales_up.forcast_sales
+FROM 
+  `palziv-data-prod.modeling.modeling_fact_sales_target` AS sales_target
+JOIN 
+  forcast_sales_up ON sales_target.sales_key_table_to_sales_target_key = forcast_sales_up.sales_key_table_to_sales_target_key
+)

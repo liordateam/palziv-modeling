@@ -1,0 +1,203 @@
+config {
+  type: "view", 
+}
+
+CREATE VIEW `palziv-data-prod.presentation.dim_db` AS (
+WITH
+l_total AS (
+  SELECT
+    order_name_line_db_id,
+    line_total_NIS AS NIS,
+    line_total_USD AS USD, 
+    line_total_GBP AS GBP, 
+    line_total_EUR AS EUR 
+  FROM `palziv-data-prod.modeling.modeling_fact_orders`
+),
+l_cost AS (
+  SELECT
+    order_name_line_db_id,
+    line_cost_NIS AS NIS,
+    line_cost_USD AS USD,
+    line_cost_GBP AS GBP,
+    line_cost_EUR AS EUR
+  FROM `palziv-data-prod.modeling.modeling_fact_orders`
+),
+l_balance AS (
+  SELECT
+    order_name_line_db_id,
+    line_balance_NIS AS NIS,
+    line_balance_USD AS USD,
+    line_balance_GBP AS GBP,
+    line_balance_EUR AS EUR 
+  FROM `palziv-data-prod.modeling.modeling_fact_orders`
+),
+l_total_up AS (
+  SELECT 
+    order_name_line_db_id,
+    currency_id,
+    line_total
+  FROM
+    l_total
+  UNPIVOT 
+    (line_total FOR currency_id IN (NIS,USD,GBP,EUR))
+),
+l_cost_up AS (
+  SELECT 
+    order_name_line_db_id,
+    currency_id,
+    line_cost
+  FROM
+    l_cost
+  UNPIVOT 
+    (line_cost FOR currency_id IN (NIS,USD,GBP,EUR))
+),
+l_balance_up AS (
+  SELECT 
+    order_name_line_db_id,
+    currency_id,
+    line_balance
+  FROM
+    l_balance
+  UNPIVOT 
+    (line_balance FOR currency_id IN (NIS,USD,GBP,EUR))
+), 
+orders AS (
+  SELECT
+    order_id,
+    agent_db_id,
+    order_name_line_db_id,                  -- Orders.OrderOrdKeyForClass
+    orders_customer_agent_part_date_db_id,  -- SalesKeyTableToOrdersKey
+    order_db_id,
+    order_name_db_id,
+    part_db_id,
+    customer_db_id,
+    db_id,                                  -- Orders.DB
+    part_id,                                -- Orders.Part
+    customer_id,                            -- Orders.Cust
+    agent_id,                               -- Orders.Agent
+    order_name,                             -- Order#
+    created_at,                             -- Orders.Date 
+    due_date,                               -- Orders.DueDate / OrdersToOrdersDueDateCalendarKey
+    updated_at,                             -- Orders.LineUDate / OrdersToOrdersLineUDateCalendarKey
+    is_closed,                              -- Orders.Closed
+    open_orders,                            -- OpenOrders
+    order_staus_descripsion,                -- Ord_Status
+    zpal_approved,                          -- Ord_Confirmed?
+    t_balance,                              -- Ord_Balance
+    t_quantity,                             -- Ord_Quant
+    unit_name,                              -- Orders.TUnitName
+    unit_description,                       -- Orders.TUnitDes
+    english_unit_description,               -- Ord_Unit
+    abalance,                               -- Orders.ABalance
+    order_type_code,                        -- Orders.OrdTypeCode
+    order_type_descripsion,                 -- Ord_Type
+    line,                                   -- Ord_Row
+    price,                                  -- Orders.Price
+    price_bal,                              -- Orders.PriceBal
+    purchase_price,                         -- Orders.UnitCost
+    qv_sales_filter,                        -- Orders.FamilyFilterFlag
+    part_non_standard                       -- Orders.PartNonStandard
+  FROM `palziv-data-prod.modeling.modeling_fact_orders`
+), 
+unpivot_lines AS (
+  SELECT 
+    l_total_up.order_name_line_db_id,
+    l_total_up.currency_id,
+    l_total_up.line_total,
+    l_cost_up.line_cost,
+    l_balance_up.line_balance,
+  FROM 
+    l_total_up
+  JOIN
+    l_cost_up ON l_total_up.order_name_line_db_id = l_cost_up.order_name_line_db_id AND l_total_up.currency_id = l_cost_up.currency_id
+  JOIN
+    l_balance_up ON l_total_up.order_name_line_db_id = l_balance_up.order_name_line_db_id AND l_total_up.currency_id = l_balance_up.currency_id
+),
+unpivot_orders AS (
+  SELECT 
+    -- 20230907 orders.order_id,
+    orders.agent_db_id,
+    orders.order_name_line_db_id,                                     -- Orders.OrderOrdKeyForClass
+    -- 20230907 orders.order_db_id,                             
+    orders.order_name_db_id,
+    orders.part_db_id,
+    orders.customer_db_id,
+    orders.db_id,                                                     -- Orders.DB
+    orders.order_name,
+    orders.created_at,                                                -- Orders.Date 
+    orders.due_date,                                                  -- Orders.DueDate / OrdersToOrdersDueDateCalendarKey
+    orders.order_staus_descripsion,                                   -- Ord_Status
+    orders.t_quantity,                                                -- Ord_Quant
+    -- 20230907 orders.unit_name,                                                 -- Orders.TUnitName
+    -- 20230907 orders.unit_description,                                          -- Orders.TUnitDes
+    orders.english_unit_description,                                  -- Ord_Unit
+    -- 20230907 orders.abalance,                                                  -- Orders.ABalance
+    -- 20230907 orders.order_type_code,                                           -- Orders.OrdTypeCode
+    orders.order_type_descripsion,                                    -- Ord_Type
+    orders.line,                                                      -- Ord_Row
+    orders.qv_sales_filter,                                           -- Orders.FamilyFilterFlag
+    -- 20230907 orders.part_non_standard,                                         -- Orders.PartNonStandard
+    unpivot_lines.currency_id,
+    unpivot_lines.line_total,
+    unpivot_lines.line_cost,
+    unpivot_lines.line_balance,
+    CASE
+      WHEN orders.t_quantity = 0 THEN unpivot_lines.line_total
+      ELSE unpivot_lines.line_total / orders.t_quantity
+    END AS line_total_avg
+  FROM orders JOIN unpivot_lines ON orders.order_name_line_db_id = unpivot_lines.order_name_line_db_id
+)
+SELECT 
+  -- 20230907 order_id,
+  agent_db_id,
+  order_name_line_db_id,                                     -- Orders.OrderOrdKeyForClass
+  -- 20230907 order_db_id,                             
+  order_name_db_id,
+  part_db_id,
+  customer_db_id,
+  db_id,                                                     -- Orders.DB
+  order_name,
+  created_at,                                                -- Orders.Date 
+  due_date,                                                  -- Orders.DueDate / OrdersToOrdersDueDateCalendarKey
+  order_staus_descripsion,                                   -- Ord_Status
+  t_quantity,                                                -- Ord_Quant
+  -- 20230907 unit_name,                                                 -- Orders.TUnitName
+  -- 20230907 unit_description,                                          -- Orders.TUnitDes
+  english_unit_description,                                  -- Ord_Unit
+  -- 20230907 abalance,                                                  -- Orders.ABalance
+  -- 20230907 order_type_code,                                           -- Orders.OrdTypeCode
+  order_type_descripsion,                                    -- Ord_Type
+  line,                                                      -- Ord_Row
+  qv_sales_filter,                                           -- Orders.FamilyFilterFlag
+  -- 20230907 part_non_standard,                                         -- Orders.PartNonStandard
+  currency_id,
+  round(line_total, 2) as line_total,
+  round(line_cost, 2) as line_cost,
+  round(line_total_avg, 2) as line_total_avg,
+  line_balance,
+  CASE
+    WHEN currency_id = 'NIS' THEN CONCAT('₪',FORMAT("%'.f", line_total)) 
+    WHEN currency_id = 'USD' THEN CONCAT('$',FORMAT("%'.f", line_total)) 
+    WHEN currency_id = 'GBP' THEN CONCAT('€',FORMAT("%'.f", line_total)) 
+    WHEN currency_id = 'EUR' THEN CONCAT('£',FORMAT("%'.f", line_total)) 
+  END AS symbol_line_total,
+  CASE
+    WHEN currency_id = 'NIS' THEN CONCAT('₪',FORMAT("%'.f", line_cost)) 
+    WHEN currency_id = 'USD' THEN CONCAT('$',FORMAT("%'.f", line_cost)) 
+    WHEN currency_id = 'GBP' THEN CONCAT('€',FORMAT("%'.f", line_cost)) 
+    WHEN currency_id = 'EUR' THEN CONCAT('£',FORMAT("%'.f", line_cost)) 
+  END AS symbol_line_cost,
+  -- CASE
+  --   WHEN currency_id = 'NIS' THEN CONCAT('₪',FORMAT("%'.2f", line_cost)) 
+  --   WHEN currency_id = 'USD' THEN CONCAT('$',FORMAT("%'.2f", line_cost)) 
+  --   WHEN currency_id = 'GBP' THEN CONCAT('€',FORMAT("%'.2f", line_cost)) 
+  --   WHEN currency_id = 'EUR' THEN CONCAT('£',FORMAT("%'.2f", line_cost)) 
+  -- END AS symbol_line_cost,
+  CASE
+    WHEN currency_id = 'NIS' THEN CONCAT('₪',FORMAT("%'.f", line_total_avg)) 
+    WHEN currency_id = 'USD' THEN CONCAT('$',FORMAT("%'.f", line_total_avg)) 
+    WHEN currency_id = 'GBP' THEN CONCAT('€',FORMAT("%'.f", line_total_avg)) 
+    WHEN currency_id = 'EUR' THEN CONCAT('£',FORMAT("%'.f", line_total_avg)) 
+  END AS symbol_line_total_avg,
+FROM unpivot_orders
+)

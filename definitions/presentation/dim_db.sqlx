@@ -1,0 +1,18 @@
+config {
+  type: "view", 
+}
+
+CREATE VIEW `palziv-data-prod.presentation.dim_db` AS (
+WITH db AS (
+  SELECT 'palziv' AS db_id UNION ALL
+  SELECT 'pna' UNION ALL
+  SELECT 'foamot' UNION ALL
+  SELECT 'puk' UNION ALL
+  SELECT 'fomsrl' UNION ALL
+  SELECT 'tropal' UNION ALL
+  SELECT 'fommex' UNION ALL
+  SELECT 'palmex' UNION ALL
+  SELECT 'pxl' 
+)
+SELECT db_id FROM db
+)

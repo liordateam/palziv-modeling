@@ -1,0 +1,17 @@
+config {
+  type: "view", 
+}
+
+CREATE VIEW `palziv-data-prod.presentation.dim_parts` AS (
+SELECT DISTINCT 
+  part_db_id,                                         -- PartToTecPartsKey / PartToWarehousesBalanceKey / SalesKeyTableToPartKey
+  db_id,                                              -- Part.DB
+  part_id,                                            -- Part.Part
+  product_line,   
+  -- 20230907 part_name,                                          -- Part_# 
+  -- 20230907 english_part_description,                           -- Part.EPartDes
+  part_description,                                   -- Part
+ 
+FROM 
+  `palziv-data-prod.modeling.modeling_dim_parts`
+)

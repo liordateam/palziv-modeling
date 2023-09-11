@@ -1,0 +1,29 @@
+config {
+  type: "view", 
+}
+
+CREATE VIEW `palziv-data-prod.presentation.fact_aging_customers` AS (
+SELECT 
+  customer_db_id,         -- CustomersToCustomerClassificationKey / SalesKeyTableToCustomersKey
+  agent_db_id,                       
+  customer_agent_db_id,   -- SalesKeyTableToAgingAndObligoAndAgingCustomersKey
+  customer_id,            -- AgingCustomers.Cust
+  db_id,                  -- AgingCustomers.DB
+  agent_id,               -- AgingCustomers.Agent
+  obligo_currency,        -- AgingCustomers.ObligoCurrency
+  currency_code,          -- AgingCustomers.ObligoCurrencyCode
+  exchange_rate,          -- AgingCustomers.ObligoExchangeRate
+  max_obligo_NIS,         -- Customers.MaxObligoNIS
+  max_obligo_USD,         -- Customers.MaxObligoUSD
+  max_obligo_GBP,         -- Customers.MaxObligoGBP
+  max_obligo_EUR,         -- Customers.MaxObligoEUR
+  bssh_ceiling_NIS,       -- Customers.BsshCeilNIS
+  bssh_ceiling_USD,       -- Customers.BsshCeilUSD
+  bssh_ceiling_GBP,       -- Customers.BsshCeilGBP
+  bssh_ceiling_EUR,       -- Customers.BsshCeilEUR
+  not_for_aging,          -- AgingCustomers.NotForAging?
+  terms_of_payment,       -- AgingCustomers.PayDes
+  zpal_bssh_notes,        -- AgingCustomers.BsshNotes
+  zpal_bssh_code,         -- AgingCustomers.BsshCode
+FROM `palziv-data-prod.modeling.modeling_fact_aging_customers`
+)

@@ -1,0 +1,55 @@
+config {
+  type: "view", 
+}
+
+CREATE VIEW `palziv-data-prod.presentation.fact_pxl_invoices` AS (
+SELECT
+  db_id,                      -- PxlInvoices.DB	
+  date,                       -- PxlInvoices.Date / PxlInvoicesToCrossRatesDateKey
+  invoice_number,             -- PxlInvoices.IvNum
+  iv_row,
+  customer_descripsion,       -- PxlInvoices.CustomerDes
+  org_curr_code,              -- PxlInvoices.OrgCurrCode
+  curr_code,                  -- PxlInvoices.CurrCode
+  product_family,             -- PxlInvoices.ProductFamily
+  part_weight,                -- PxlInvoices.PartWeight
+  basic_material,             -- PxlInvoices.BasicMaterial
+  part_name,                  -- PxlInvoices.PartName
+  part_descripsion,           -- PxlInvoices.PartDes
+  part_descripsion_cont,      -- PxlInvoices.PartDesCont
+  part_vol_board_foot,        -- PxlInvoices.PartVolBoardFoot
+  quant,                      -- PxlInvoices.Quant
+  tot_price,                  -- PxlInvoices.TotPrice
+  unit_price,                 -- PxlInvoices.UnitPrice
+  tot_cost,                   -- PxlInvoices.TotCost
+  unit_cost,                  -- PxlInvoices.UnitCost
+  usd,                        -- PxlInvoices.USD
+  euro,                       -- PxlInvoices.EUR
+  gbp,                        -- PxlInvoices.GBP
+  cad,                        -- PxlInvoices.CAD
+  ----- Exchange - Line Total -----
+  line_total_nis,             -- PxlInvoices.LineTotalNIS
+  line_total_usd,             -- PxlInvoices.LineTotalUSD
+  line_total_gbp,             -- PxlInvoices.LineTotalGBP
+  line_total_euro,            -- PxlInvoices.LineTotalEUR
+  ----- Exchange - Line Cost -----
+  line_cost_nis,              -- PxlInvoices.LineCostNIS
+  line_cost_usd,              -- PxlInvoices.LineCostUSD
+  line_cost_gbp,              -- PxlInvoices.LineCostGBP
+  line_cost_euro,             -- PxlInvoices.LineCostEUR
+  ----- Exchange - UNIT Price -----
+  unit_price_nis,             -- PxlInvoices.UnitPriceNIS
+  unit_price_usd,             -- PxlInvoices.UnitPriceUSD 
+  unit_price_gbp,             -- PxlInvoices.UnitPriceGBP
+  unit_price_euro,            -- PxlInvoices.UnitPriceEUR
+  ----- Exchange - UNIT Cost -----
+  unit_cost_nis,              -- PxlInvoices.UnitCostNIS
+  unit_cost_usd,              -- PxlInvoices.UnitCostUSD
+  unit_cost_gbp,              -- PxlInvoices.UnitCostGBP
+  unit_cost_euro,             -- PxlInvoices.UnitCostEUR
+  salesman,                   -- PxlInvoices.Sales_man
+  market,                     -- PxlInvoices.Cust_Market
+  country,                    -- PxlInvoices.CountryName
+FROM
+  `palziv-data-prod.modeling.modeling_fact_pxl_invoices`
+)

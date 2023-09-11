@@ -1,0 +1,11 @@
+config {
+  type: "view", 
+}
+
+CREATE VIEW `palziv-data-prod.presentation.dim_orders` AS (
+SELECT DISTINCT
+  order_db_id, 
+  order_name_db_id 
+FROM 
+  `palziv-data-prod.modeling.modeling_fact_orders`  
+)

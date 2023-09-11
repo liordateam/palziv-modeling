@@ -1,0 +1,10 @@
+config {
+  type: "view", 
+}
+
+CREATE VIEW `palziv-data-prod.presentation.dim_currencies` AS (
+SELECT  
+  currency_id,
+  index
+FROM `palziv-data-prod.modeling.modeling_dim_currencies`
+)

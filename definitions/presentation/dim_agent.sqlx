@@ -1,0 +1,15 @@
+config {
+  type: "view", 
+}
+
+CREATE VIEW `palziv-data-prod.presentation.dim_agent` AS (
+SELECT 
+  agent_db_id,                   -- AgentsToAgentArcKey
+  db_id,                         -- Agent.DB
+  agent_id,                      -- Agent.Agent
+  -- 20230907 agent_code,                    -- Sales Rep. #
+  agent_name,                    -- Sales Rep.
+  -- 20230907 agent_director_code,           -- Sales Director # 
+  -- 20230907 agent_director_name,           -- Sales Director
+FROM `palziv-data-prod.modeling.modeling_dim_agent`
+)

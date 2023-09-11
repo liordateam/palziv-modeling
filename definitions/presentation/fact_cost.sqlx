@@ -1,0 +1,18 @@
+config {
+  type: "view", 
+}
+
+CREATE VIEW `palziv-data-prod.presentation.fact_cost` AS (
+SELECT 
+  part_db_id,             -- Cost.PartKey
+  part_date_db_id,        -- Cost.DBPartYearMonth_FullKey
+  cur_date,               -- Cost.Curdate
+  type,                   -- CostPartCost.Type 
+  total,                  -- Cost.Total
+  raw_material,           -- Cost.RawMaterial
+  wkc_1,                  -- Cost.WorkCenter
+  emp_1,                  -- Cost.Employees
+  sup_1,                  -- Cost.Sup	
+FROM 
+  `palziv-data-prod.modeling.modeling_fact_cost` AS pc
+)
