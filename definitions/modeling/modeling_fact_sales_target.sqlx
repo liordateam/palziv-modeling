@@ -1,0 +1,174 @@
+config {
+  type: "view",
+}
+
+CREATE VIEW `palziv-data-prod.modeling.modeling_fact_sales_target` AS (
+WITH sales_target_head AS (
+  SELECT
+    salestargets.sales_target_db_id,                  -- SalesTargetToSalesTargetItemsKey
+    salestargets.currency_db_id,                      -- SalesTargetToCurrencyKey
+    salestargets.db_id,                               -- SalesTarget.DB
+    salestargets.sales_target_number,                 -- SalesTarget.ST#
+    salestargets.sales_target_id,                     -- SalesTarget.ST
+    salestargets.sales_year,                          -- SalesTarget.Year
+    salestargets.sales_descripsion,                   -- SalesTarget.StDes
+    salestargets.sales_target_status,                 -- SalesTarget.Stat
+    salestargets.type,                                -- SalesTarget.Type
+    salestargets.updated_at,
+    currencies.currency_id,                           -- SalesTarget.Currency
+    currencies.exchange_rate                          -- SalesTarget.ExchangeRate
+  FROM `palziv-data-prod.dwh.dwh_salestargets` AS  salestargets
+  JOIN
+    `palziv-data-prod.dwh.dwh_salestargetstats` AS salestargetstats
+  ON CONCAT(salestargets.db_id, salestargets.sales_target_status) = CONCAT(salestargetstats.db_id, salestargetstats.status) AND salestargetstats.final = 1
+  LEFT JOIN
+    `palziv-data-prod.dwh.dwh_currencies` AS currencies
+  ON
+    salestargets.currency_db_id = currencies.currency_db_id
+  WHERE
+    sales_target_id <> 0
+    AND salestargets.db_id IN  ('palziv', 'pna', 'foamot', 'puk', 'fomsrl', 'tropal', 'fommex', 'palmex')
+    AND sales_year >= 2018
+    AND currencies.currency_id <> 0
+)
+,sales_target_items AS (
+  SELECT
+    sales_target_db_id || '_' || customer_db_id || '_' ||  month || '_' || k_line || '_' || agent_db_id AS unique_key,
+    sales_target_db_id,                                         
+    part_db_id,
+    part_id,                                          -- SalesTargetItems.Part
+    customer_db_id,
+    agent_db_id,
+    db_id,                                            -- SalesTargetItems.DB
+    sales_target_id,                                  -- SalesTargetItems.ST
+    k_line,                                           -- SalesTargetItems.Kline
+    customer_id,                                      -- SalesTargetItems.Cust
+    agent_id,                                         -- SalesTargetItems.Agent
+    month,                                            -- SalesTargetItems.Month
+    forcast_sales                                     -- SalesTargetItems.ForcastSales
+  FROM 
+    `palziv-data-prod.dwh.dwh_salestargetsitems` 
+  UNPIVOT(forcast_sales FOR month IN (jan_price AS '1',feb_price AS '2',mar_price AS '3',apr_price AS '4',may_price AS '5',jun_price AS '6',jul_price AS '7',aug_price AS '8',sep_price AS '9',oct_price AS '10',nov_price AS '11',dec_price AS '12'))
+  WHERE sales_target_id <> 0
+  AND db_id IN  ('palziv', 'pna', 'foamot', 'puk', 'fomsrl', 'tropal', 'fommex', 'palmex')
+  AND forcast_sales <> 0
+)
+,sales_target_items_quant AS (
+  SELECT
+    sales_target_db_id || '_' || customer_db_id || '_' ||  month || '_' || k_line || '_' || agent_db_id AS unique_key,    
+    sales_target_db_id,
+    part_db_id,
+    part_id,                                          -- SalesTargetItems.Part
+    customer_db_id,
+    agent_db_id,
+    db_id,                                            -- SalesTargetItems.DB
+    sales_target_id,                                  -- SalesTargetItems.ST
+    k_line,                                           -- SalesTargetItems.Kline
+    customer_id,                                      -- SalesTargetItems.Cust
+    agent_id,                                         -- SalesTargetItems.Agent
+    month,                                            -- SalesTargetItems.Month
+    forcast_quant                                     -- SalesTargetItems.ForcastQuant
+  FROM 
+    `palziv-data-prod.dwh.dwh_salestargetsitems` 
+
+  UNPIVOT(forcast_quant FOR month IN (jan_quant AS '1',feb_quant AS '2',mar_quant AS '3',apr_quant AS '4',may_quant AS '5',jun_quant AS '6',jul_quant AS '7',aug_quant AS '8',sep_quant AS '9',oct_quant AS '10',nov_quant AS '11',dec_quant AS '12'))
+  WHERE sales_target_id != 0
+  AND db_id IN  ('palziv', 'pna', 'foamot', 'puk', 'fomsrl', 'tropal', 'fommex', 'palmex')
+  AND forcast_quant !=0
+)
+,sales_target AS (
+  SELECT
+    COALESCE(items.sales_target_db_id, quant.sales_target_db_id) AS sales_target_db_id,
+    COALESCE(items.part_db_id, quant.part_db_id) AS part_db_id,
+    COALESCE(items.customer_db_id, quant.customer_db_id) AS customer_db_id,
+    COALESCE(items.agent_db_id, quant.agent_db_id) AS agent_db_id,
+    COALESCE(items.agent_id, quant.agent_id) AS agent_id,                                           -- SalesTarget.Agent
+    head.currency_id,                                                                               -- SalesTarget.Currency
+    COALESCE(items.customer_id, quant.customer_id) AS customer_id,                                  -- SalesTarget.Cust
+    head.db_id,                                                                                     -- SalesTarget.DB
+    head.exchange_rate,                                                                             -- SalesTarget.ExchangeRate
+    quant.forcast_quant,                                                                            -- SalesTarget.ForcastQuant
+    items.forcast_sales,                                                                            -- SalesTarget.ForcastSales
+    items.forcast_sales * head.exchange_rate AS company_forcast_sales,                              -- SalesTarget.CompanyForcastSales
+    COALESCE(items.k_line, quant.k_line) AS k_line,                                                 -- SalesTarget.Kline
+    COALESCE(items.month, quant.month) AS month,                                                    -- SalesTarget.Month
+    COALESCE(items.part_id, quant.part_id) AS part_id,                                              -- SalesTarget.Part
+    head.sales_target_id,                                                                           -- SalesTarget.ST
+    head.sales_target_number,                                                                       -- SalesTarget.ST#
+    head.sales_descripsion,                                                                         -- SalesTarget.StDes
+    head.sales_year,                                                                                -- SalesTarget.Year
+    DATE(head.sales_year, CAST(COALESCE(items.month, quant.month) AS INT64), 1) AS full_date,       -- SalesTarget.Date
+    CONCAT(head.sales_year,'-', COALESCE(items.month, quant.month)) AS sales_target_ym,             -- SalesTarget.YM
+    exchange_rate.euro,
+    exchange_rate.usd,
+    exchange_rate.cad,
+    exchange_rate.ron,
+    exchange_rate.mxn,
+    exchange_rate.gbp
+  FROM 
+    sales_target_items AS items
+  FULL JOIN 
+    sales_target_items_quant AS quant
+  ON items.unique_key = quant.unique_key
+  INNER JOIN 
+    sales_target_head AS head
+  ON 
+    items.sales_target_db_id = head.sales_target_db_id 
+    OR quant.sales_target_db_id = head.sales_target_db_id
+  CROSS JOIN
+    `palziv-data-prod.modeling.modeling_dim_exchange_rate` AS exchange_rate 
+)
+SELECT 
+  sales_target_db_id,
+  part_db_id,
+  customer_db_id,
+  agent_db_id,
+  agent_id,                                                                       -- SalesTarget.Agent
+  currency_id,
+  customer_id,                                                                    -- SalesTarget.Cust
+  db_id,                                                                          -- SalesTarget.DB
+  exchange_rate,
+  forcast_quant,
+  forcast_sales,
+  k_line,                                                                         -- SalesTarget.Kline
+  month,
+  part_id,                                                                        -- SalesTarget.Part
+  sales_target_id,                                                                -- SalesTarget.ST
+  sales_target_number,                                                            -- SalesTarget.ST#
+  sales_descripsion,                                                              -- SalesTarget.StDes
+  sales_year,                                                                     -- SalesTarget.Year
+  full_date,                                                                      -- SalesTarget.Date / SalesTargetToSalesTargetCalenderKey
+  sales_target_ym,                                                                -- SalesTarget.YM
+  company_forcast_sales,                                                          -- SalesTarget.CompanyForcastSales
+  0 AS qv_sales_filter,
+  CASE
+    WHEN db_id IN ('palziv', 'foamot') THEN company_forcast_sales
+    WHEN db_id = 'pna'  THEN company_forcast_sales * usd
+    WHEN db_id = 'puk'  THEN company_forcast_sales * gbp
+    WHEN db_id IN ('fomsrl', 'tropal') THEN company_forcast_sales * ron
+    ELSE company_forcast_sales * mxn
+  END AS forcast_sales_nis,                                                       -- SalesTarget.ForcastSalesNIS
+  CASE
+    WHEN db_id IN ('palziv', 'foamot') THEN company_forcast_sales / gbp
+    WHEN db_id = 'pna'  THEN  company_forcast_sales * (usd / gbp)
+    WHEN db_id = 'puk'  THEN  company_forcast_sales 
+    WHEN db_id IN ('fomsrl', 'tropal') THEN  company_forcast_sales * (ron / gbp)
+    ELSE company_forcast_sales * (mxn / gbp)
+  END AS forcast_sales_gbp,                                                       -- SalesTarget.ForcastSalesGBP
+  CASE
+    WHEN db_id IN ('palziv', 'foamot') THEN company_forcast_sales / usd
+    WHEN db_id = 'pna'  THEN  company_forcast_sales  
+    WHEN db_id = 'puk'  THEN  company_forcast_sales  * (gbp / usd)
+    WHEN db_id IN ('fomsrl', 'tropal') THEN  company_forcast_sales * (ron / usd)
+    ELSE company_forcast_sales * (mxn / usd)
+  END AS forcast_sales_usd,                                                       -- SalesTarget.ForcastSalesUSD
+  CASE
+    WHEN db_id IN ('palziv', 'foamot') THEN company_forcast_sales / euro
+    WHEN db_id = 'pna'  THEN company_forcast_sales * (usd / euro)  
+    WHEN db_id = 'puk'  THEN company_forcast_sales * (gbp / euro)
+    WHEN db_id IN ('fomsrl', 'tropal') THEN company_forcast_sales * (ron / euro)
+    ELSE company_forcast_sales * (mxn / euro)
+  END AS forcast_sales_eur,                                                       -- SalesTarget.ForcastSalesEUR
+  db_id   ||'_' || customer_id  ||'_' || agent_id  ||'_' || part_id  ||'_' || sales_target_ym AS sales_key_table_to_sales_target_key -- SalesKeyTableToSalesTargetKey
+FROM sales_target
+)

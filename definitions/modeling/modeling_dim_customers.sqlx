@@ -1,0 +1,252 @@
+config {
+  type: "view", 
+}
+
+CREATE VIEW `palziv-data-prod.modeling.modeling_dim_customers` AS (
+WITH
+pxl_invoice AS (
+  SELECT DISTINCT 
+    db_id,
+    customer_descripsion,
+    salesman,
+    market,
+    country,
+  FROM `palziv-data-prod.modeling.modeling_fact_pxl_invoices` 
+),
+temp_customers AS(
+  SELECT 
+    customers.customer_db_id,                                   -- CustomersToCustomerClassificationKey / SalesKeyTableToCustomersKey
+    CAST(customers.customer_id AS STRING) as customer_id,       -- Customers.Cust
+    customers.db_id,                                            -- Customers.DB
+    customers.account_id,                                       -- Customers.Account
+    customers.customer_name,                                    -- Cust_#
+    customers.customer_description,                             -- Customer
+    ctype2.customer_type2_name,                                 -- Cust_Market
+    countries.country_name,                                     -- Customers.CountryName
+    warehouses.warehouse_name,                                  -- Customers.WarhsName
+    customer_size.customer_size_description,                    -- Cust size
+    customers.market_type,                                      -- Customers.MarketType
+    customers.branch_id,   
+    custspec.service_rep,                                       -- Service Rep.
+    custspec.parent_customer,                                   -- Parent Customer
+    custspec.customer_sector,                                   -- Cust. Sector
+    customers.zpal_rafael,                                      -- Defense
+    customers.ztsv_freight_percentage / 100 AS freight_percentage,          -- Freight%
+    customers.ztsv_container_cost AS container_cost,                        -- Customer.ContainerCost
+    paying_customers.customer_description AS paying_customer_description,   -- Customers.BillingCust
+    paying_customers.customer_name AS paying_customer_name,     -- Customers.BillingCust#
+    representative_customers.customer_description AS representative_customer_description, -- Customers.RepresentativeCust
+    customers.zpal_bssh_notes,                                  -- Customers.BsshNotes
+    customers.zpal_bssh_code,                                   -- Customers.BsshCode
+    CAST(world_region.world_region_id AS STRING) AS territory_code,         -- Customers.TerritoryCode
+    world_region.world_region_description AS territory,         -- Customers.Territory
+    customers.ztsv_icode,                                       -- Customers.InterCompanyType
+    customers.customer_status_id,                               -- Customers.CustStat
+    customers.currency_id,                                      -- Customers.Curreny
+    exchange_rate.usd,
+    exchange_rate.gbp,
+    exchange_rate.euro,
+    exchange_rate.cad,
+    exchange_rate.mxn,
+    exchange_rate.ron
+  FROM 
+    `palziv-data-prod.dwh.dwh_customers` AS customers
+  LEFT JOIN 
+    `palziv-data-prod.dwh.dwh_ctype2` AS ctype2 ON  customers.customer_type2_db_id = ctype2.customer_type2_db_id 
+  LEFT JOIN
+    `palziv-data-prod.dwh.dwh_countries` AS countries ON customers.country_db_id = countries.country_db_id 
+  LEFT JOIN
+    `palziv-data-prod.dwh.dwh_custspec` AS custspec ON customers.customer_spec_db_id = custspec.customer_spec_db_id 
+  LEFT JOIN
+    `palziv-data-prod.dwh.dwh_customers` AS paying_customers ON customers.paying_customer_db_id = paying_customers.customer_db_id 
+  LEFT JOIN
+    `palziv-data-prod.dwh.dwh_customers` AS representative_customers ON customers.mcust_db_id = representative_customers.customer_db_id 
+  LEFT JOIN
+    `palziv-data-prod.dwh.dwh_warehouses` AS warehouses ON customers.warehouse_db_id = warehouses.warehouses_db_id 
+  LEFT JOIN
+    `palziv-data-prod.dwh.dwh_ztsv_custsize` AS customer_size ON customers.customer_size_db_id = customer_size.customer_size_db_id 
+  LEFT JOIN
+    `palziv-data-prod.dwh.dwh_ztsv_worldregion` AS world_region ON countries.world_region_db_id = world_region.world_region_db_id 
+  JOIN
+    `palziv-data-prod.modeling.modeling_dim_exchange_rate` AS exchange_rate ON true
+  WHERE customers.db_id IN ('palziv', 'pna', 'foamot', 'puk', 'fomsrl', 'tropal','fommex','palmex')
+  UNION ALL
+  SELECT 
+    CONCAT(db_id, '_', customer_descripsion) AS customer_db_id,   -- CustomersToCustomerClassificationKey / SalesKeyTableToCustomersKey
+    customer_descripsion AS customer_id,                          -- Customers.Cust
+    db_id,                                                        -- Customers.DB
+    NULL AS account_id,                                           -- Customers.Account
+    CAST(NULL AS STRING) AS customer_name,                        -- Cust_#
+    customer_descripsion AS customer_description,                 -- Customers.CustDes
+    market AS customer_type2_name,                                -- Cust_Market
+    country AS country_name,                                      -- Customers.CountryName
+    CAST(NULL AS STRING) AS warehouse_name,                       -- Customers.WarhsName
+    CAST(NULL AS STRING) AS customer_size_description,            -- Cust size
+    CAST(NULL AS STRING) AS market_type,                          -- Customers.MarketType
+    NULL AS branch_id,   
+    CAST(NULL AS STRING) AS service_rep,                          -- Service Rep.
+    CAST(NULL AS STRING) AS parent_customer,                      -- Parent Customer
+    CAST(NULL AS STRING) AS customer_sector,                      -- Cust. Sector
+    CAST(NULL AS STRING) AS zpal_rafael,                          -- Defense
+    NULL AS freight_percentage,                                   -- Freight%
+    NULL AS container_cost,                                       -- Customer.ContainerCost
+    CAST(NULL AS STRING) AS paying_customer_description,          -- Customers.BillingCust
+    CAST(NULL AS STRING) AS paying_customer_name,                 -- Customers.BillingCust#
+    CAST(NULL AS STRING) AS representative_customer_description,  -- Customers.RepresentativeCust
+    CAST(NULL AS STRING) AS zpal_bssh_notes,                      -- Customers.BsshNotes
+    NULL AS zpal_bssh_code,                                       -- Customers.BsshCode
+    NULL AS territory_code,                                       -- Customers.TerritoryCode
+    CAST(NULL AS STRING) AS territory,                            -- Customers.Territory
+    NULL AS ztsv_icode,                                           -- Customers.InterCompanyType
+    NULL AS customer_status_id,                                   -- Customers.CustStat
+    NULL AS currency_id,                                          -- Customers.Curreny
+    NULL AS usd,                                                 
+    NULL AS gbp,
+    NULL AS euro,
+    NULL AS cad,
+    NULL AS mxn,
+    NULL AS ron
+  FROM pxl_invoice
+), 
+customers AS (
+  SELECT
+    customer_db_id,                         -- CustomersToCustomerClassificationKey / SalesKeyTableToCustomersKey
+    customer_id,                            -- Customers.Cust
+    db_id,                                  -- Customers.DB
+    account_id,                             -- Customers.Account
+    IFNULL(customer_name, 'Unknown') AS customer_name,                          -- Cust_#
+    IFNULL(customer_description, 'Unknown') AS customer_description,            -- Customer
+    IFNULL(customer_type2_name, 'Unknown') AS customer_type2_name,              -- Cust_Market
+    IFNULL(country_name, 'Unknown') AS country_name,                            -- Customers.CountryName
+    IFNULL(warehouse_name, 'Unknown') AS warehouse_name,                        -- Customers.WarhsName
+    IFNULL(customer_size_description, 'Unknown') AS customer_size_description,  -- Cust size
+    IFNULL(market_type, 'Unknown') AS market_type,                              -- Customers.MarketType
+    IFNULL(representative_customer_description, customer_description) AS representative_customer_description,  -- Customers.RepresentativeCust
+    IFNULL(territory_code, 'Unknown') AS territory_code,                        -- Customers.TerritoryCode
+    IFNULL(territory, 'Unknown') AS territory,                                  -- Customers.Territory
+    IFNULL(service_rep, 'Unknown') AS service_rep,                              -- Service Rep.
+    IFNULL(parent_customer, customer_description) AS parent_customer,           -- Parent Customer
+    IFNULL(customer_sector, 'Unknown') AS customer_sector,                      -- Cust. Sector
+    zpal_rafael,                            -- Defense
+    freight_percentage,                     -- Freight%
+    container_cost,                         -- Customer.ContainerCost
+    CASE
+      WHEN db_id = 'palziv' AND branch_id = 1 THEN 'Packing'
+      WHEN db_id = 'palziv' THEN 'Israel'
+      WHEN db_id = 'puk' THEN 'PUK'
+      WHEN db_id = 'tropal' THEN 'Tropal'
+      WHEN db_id = 'pna' THEN 'PNA'
+      WHEN db_id = 'pxl' THEN 'PXL'
+      WHEN db_id = 'palmex' THEN 'PMEX'
+      WHEN db_id = 'fomsrl' THEN 'SRL'
+      WHEN db_id = 'foamot' THEN 'Foamotive'
+      WHEN db_id = 'fommex' THEN 'FMEX'
+      ELSE 'Unknown'
+    END AS palziv_class,                    -- Customers.PalzivClass
+    CASE
+      WHEN db_id = 'palziv' AND branch_id = 1 THEN 'Packing'
+      WHEN db_id IN ('palziv', 'puk', 'tropal') THEN 'Israel'
+      WHEN db_id IN ('pna', 'pxl', 'palmex') THEN 'PNA'
+      WHEN db_id IN ('fomsrl', 'foamot', 'fommex') THEN 'FMTV'
+      ELSE 'Unknown'
+    END AS group_company,                   -- Customers.GroupCompany
+    -----------------------------------------
+    --  vLastExchangeUSD = 'palziv_-2')
+    --  vLastExchangeCAD = 'palziv_13')
+    --  vLastExchangeEUR = 'palziv_29')
+    --  vLastExchangeGBP = 'palziv_30')
+    --  vLastExchangeRON = 'palziv_88')
+    --  vLastExchangeMXN = 'palziv_70')
+    CASE 
+      WHEN db_id IN ('palziv', 'foamot') THEN container_cost
+      WHEN db_id = 'pna' THEN container_cost * usd 
+      WHEN db_id = 'puk' THEN container_cost * gbp 
+      WHEN db_id IN ('fomsrl', 'tropal') THEN container_cost * ron 
+      ELSE container_cost * mxn
+    END AS container_cost_NIS,              -- Customers.ContainerCostNIS
+    CASE 
+      WHEN db_id IN ('palziv', 'foamot') THEN container_cost / usd
+      WHEN db_id = 'pna' THEN container_cost
+      WHEN db_id = 'puk' THEN container_cost * gbp / usd  
+      WHEN db_id IN ('fomsrl', 'tropal') THEN container_cost * ron / usd 
+      ELSE container_cost * mxn / usd 
+    END AS container_cost_USD,              -- Customers.ContainerCostUSD
+    CASE 
+      WHEN db_id IN ('palziv', 'foamot') THEN container_cost / gbp 
+      WHEN db_id = 'pna' THEN container_cost * usd / gbp  
+      WHEN db_id = 'puk' THEN container_cost 
+      WHEN db_id IN ('fomsrl', 'tropal') THEN container_cost * ron / gbp 
+      ELSE container_cost * mxn / gbp 
+    END AS container_cost_GBP,              -- Customers.ContainerCostGBP
+    CASE 
+      WHEN db_id IN ('palziv', 'foamot') THEN container_cost / euro 
+      WHEN db_id = 'pna' THEN container_cost * usd / euro  
+      WHEN db_id = 'puk' THEN container_cost * gbp / euro  
+      WHEN db_id IN ('fomsrl', 'tropal') THEN container_cost * ron / euro 
+      ELSE container_cost * mxn / euro 
+    END AS container_cost_EUR,              -- Customers.ContainerCostEUR
+    ---------------------------------------
+    paying_customer_description,            -- Customers.BillingCust
+    paying_customer_name,                   -- Customers.BillingCust#
+    zpal_bssh_notes,                        -- Customers.BsshNotes
+    zpal_bssh_code,                         -- Customers.BsshCode
+    CASE 
+      WHEN CONCAT(db_id, '-', customer_description) = 'pxl-PALZIV NORTH AMERICA' THEN 2
+      WHEN CONCAT(db_id, '-', customer_description) IN ('fomsrl-Foamotive Ltd', 'tropal-Foamotive S.R.L.', 'tropal-Palziv UK Ltd', 'tropal-Palziv Ltd') THEN 1
+      WHEN ztsv_icode IS NOT NULL THEN ztsv_icode
+      ELSE 0
+    END AS intercompany_sales,              -- Intercompany_Sales
+    CASE 
+      WHEN CONCAT(db_id, '-', paying_customer_name) = 'pna-32000238' THEN 1
+      WHEN db_id = 'pxl' AND UPPER(customer_description) LIKE ('%HOME DEPOT%') THEN 1
+      ELSE 0
+    END AS is_home_depot,                   -- Customers.IsHomeDepot
+    CASE 
+      WHEN CONCAT(db_id, '-', customer_name) = 'palziv-32300005' THEN 'PUK'
+      WHEN db_id = 'puk' THEN 'PUK'
+      ELSE NULL
+    END AS customers_who_can_see_me,        -- CustomersWhoCanSeeMe
+    customer_status_id,                     -- Customers.CustStat
+    currency_id                             -- Customers.Curreny
+  FROM temp_customers
+)
+
+SELECT 
+  customer_db_id,                         -- CustomersToCustomerClassificationKey / SalesKeyTableToCustomersKey
+  customer_id,                            -- Customers.Cust
+  db_id,                                  -- Customers.DB
+  account_id,                             -- Customers.Account
+  customer_name,                          -- Cust_#
+  customer_description,                   -- Customer
+  customer_type2_name,                    -- Cust_Market
+  country_name,                           -- Customers.CountryName
+  warehouse_name,                         -- Customers.WarhsName
+  customer_size_description,              -- Cust size
+  market_type,                            -- Customers.MarketType
+  palziv_class,                           -- Customers.PalzivClass
+  group_company,                          -- Customers.GroupCompany
+  service_rep,                            -- Service Rep.
+  parent_customer,                        -- Parent Customer
+  customer_sector,                        -- Cust. Sector
+  zpal_rafael,                            -- Defense
+  freight_percentage,                     -- Freight%
+  container_cost,                         -- Customer.ContainerCost
+  container_cost_NIS,                     -- Customers.ContainerCostNIS
+  container_cost_USD,                     -- Customers.ContainerCostUSD
+  container_cost_GBP,                     -- Customers.ContainerCostGBP
+  container_cost_EUR,                     -- Customers.ContainerCostEUR
+  paying_customer_description,            -- Customers.BillingCust
+  paying_customer_name,                   -- Customers.BillingCust#
+  representative_customer_description,    -- Customers.RepresentativeCust
+  zpal_bssh_notes,
+  zpal_bssh_code,
+  territory_code,                         -- Customers.TerritoryCode
+  territory,                              -- Customers.Territory
+  intercompany_sales,                     -- Intercompany_Sales
+  is_home_depot,                          -- Customers.IsHomeDepot
+  customers_who_can_see_me,               -- CustomersWhoCanSeeMe
+  customer_status_id,                     -- Customers.CustStat
+  currency_id                             -- Customers.Curreny
+FROM 
+  customers 
+)

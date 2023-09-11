@@ -1,0 +1,1018 @@
+config {
+  type: "view", 
+}
+
+CREATE VIEW `palziv-data-prod.modeling.modeling_fact_invoices` AS (
+WITH 
+  invoice_temp AS (
+    SELECT 
+      invoices_head.invoice_db_id,                                                -- Invoice.InvKey / InvoicesHeadToInvoiceAKey / InvoicesHeadToInvoiceItemsKey
+      invoice_lines.part_db_id,                                                   -- InvoiceItems.PartKey
+      invoices_head.db_id,                                                        -- Invoices.DB
+      invoices_head.invoice_number,                                               -- Invoices.IvNum
+      invoices_head.invoice_date,                                                 -- Invoices.Date / ExchRateKey3
+      invoice_lines.updated_at AS i_updated_at,                                   -- Invoices.ItemsUDate
+      invoices_head.credit_or_debit,                                              -- Invoices.CreditOrDebit
+      invoices_head.debit,                                                        -- Invoices.Debit
+      invoices_head.pay_date,                                                     -- Invoices.PayDate
+      invoices_head.qprice AS q_price,                                            -- Invoices.QPrice
+      invoices_head.code AS h_cur_code,                                           -- Invoices.Head_CurrCode
+      invoices_head.currency_name,                                                -- Invoices.Head_CurrName
+      invoices_head.t_percent AS h_t_percent,                                     -- Inviices.HeaderTPercent
+      invoice_lines.t_percent AS i_t_percent,                                     -- Invoices.ItemsTPercent
+      invoices_head.user_id,                                                      -- Invoices.TUser
+      invoices_head.tot_price,                                                    -- Invoices.TotPrice
+      invoices_head.updated_at AS h_updated_at,                                   -- Invoices.HeadUDate
+      invoices_head.vat,                                                          -- Invoices.Vat
+      invoices_head.vat_price,                                                    -- Invoices.VatPrice
+      invoice_lines.quant,                                                        -- Invoices.Quant
+      invoice_lines.currency_id,                                                  -- Invoices.Currency
+      invoice_lines.i_currency,                                                   -- Invoices.ICurrency
+      invoice_lines.code AS cur_code,                                             -- Invoices.CurrCode / Inv_Curr
+      invoices_head.exchange_3,                                                   -- Invoices.Exchange3
+      invoices_head.exchange_rate,                                                -- Invoices.Exchange
+      invoices_head.cur_date,                                                     -- Invoices.CurregCurDate
+      invoices_head.exchange,                                                     -- Invoices.CurregExchange
+      invoices_head.currency3,                                                    -- FncCurrency3
+      invoice_lines.i_exchange,                                                   -- Invoices.IExchange	
+      invoice_lines.iv_cost,                                                      -- Invoices.IvCost	
+      invoice_lines.line,                                                         -- Invoices.Line	
+      invoice_lines.price AS unit_price,                                          -- Invoices.UnitPrice	
+      invoice_lines.prsource,                                                     -- Invoices.PRSource	
+      invoice_lines.q_price AS q_price_2,                                         -- Invoices.QPrice2		
+      invoices_head.customer_id,                                                  -- Invoices.Cust
+      invoices_head.details,                                                      -- Invoices.Details                     
+      invoice_lines.user_id AS user_id_2,                                         -- Invoices.TUser2 	
+      invoice_lines.tot_percent,                                                  -- Invoices.TotPercent 
+      invoice_lines.t_quant,                                                      -- Invoices.TQuant
+      invoice_lines.ztsv_cost_quant,                                              -- Invoiceitems.ZTSV_COSTQUANT => For new feature
+      invoice_lines.ztsv_stdfun_cost,                                             -- Invoiceitems.ZTSV_STDFUNCCOST => For new fature
+      invoice_lines.conversion_rate,                                              -- Part.Conv => For new feature
+      invoice_lines.type,                                                         -- Invoices.Type
+      invoice_lines.unit_name,                                                    -- Invoices.Unit#
+      invoice_lines.unit_description,                                             -- Invoices.Unit
+      invoice_lines.english_unit_description,                                     -- Invoices.EUnitDes
+      invoices_head.status_descripsion,                                           -- Invoices.Status
+      invoices_head.status_id,                                                    -- Invoices.IvStat
+      invoices_head.is_canceled,                                                  -- Invoices.Canceled?
+      -- Invoices.IvDes - absent from table invoice_type
+      invoices_head.english_invoice_descripsion,                                  -- Invoices.EIvDes  -   replace ivdes whice is absent
+      invoice_lines.part_final_conv,                                              -- Invoices.UnitFinalConv
+      invoice_lines.part_non_standard,                                            -- Invoices.PartNonStandard
+      invoice_lines.qv_sales_filter,                                              -- Invoices.FamilyFilterFlag  
+      invoice_lines.account_name,                                                 -- Invoices.AccountName
+      invoice_lines.account_descripsion,                                          -- Invoices.AccountDes
+      invoice_lines.ztsv_ic_code,                                                 -- Invoices.AccountIntercompanyFlag
+      invoice_lines.reference,                                                    -- Invoices.Orders_CustPO
+      invoice_lines.zpal_pack_flag,                                               -- Invoices.PalzivPackingTradeFlag
+      invoice_lines.ztsv_volin_cont_cbm,                                          -- Invoices.PartVolumeInContainerM3
+      invoice_lines.ztsv_cont_cost,                                               -- Invoices.ContainerCostCompanyMainCurr
+      invoice_lines.cost AS unit_cost,                                            -- Invoices.UnitCost
+      invoice_lines.std_cost AS unit_std_cost,                                    -- Invoices.UnitStdCost
+      invoices_head.invoice_id,                                                   -- Invoice.IV
+      invoice_lines.part_id,                                                      -- Invoices.Part
+      invoices_head.agent_id,                                                     -- Invoices.Agent
+      invoices_head.imp_file_id,                                                  -- Invoice.ImpFile
+      cross_rates.usd,                                                            -- Invoices.USD
+      cross_rates.gbp,                                                            -- Invoices.GBP
+      cross_rates.euro,                                                           -- Invoices.EURO
+      cross_rates.ron,                                                            -- Invoices.RON
+      cross_rates.mxn                                                             -- Invoices.MXN
+    FROM
+      `palziv-data-prod.modeling.modeling_fact_invoices_head` AS invoices_head
+    LEFT JOIN
+      `palziv-data-prod.modeling.modeling_fact_invoice_lines` AS invoice_lines ON invoices_head.invoice_db_id = invoice_lines.invoice_db_id
+    LEFT JOIN 
+      `palziv-data-prod.modeling.modeling_fact_cross_rates` AS cross_rates ON invoices_head.invoice_date = cross_rates.date
+  ), invoice_to_part_cost_temp AS (
+    SELECT DISTINCT
+      invoice_temp.part_db_id,                                                    -- MapInvoiceDateToPartCostDate.PartKey
+      cost.cur_date,                                                              -- MapInvoiceDateToPartCostDate.PartCostDate
+      LAST_DAY(invoice_temp.invoice_date, MONTH) AS inv_end_month,                -- MapInvoiceDateToPartCostDate.InvEndMonthDate 
+      CASE
+        WHEN cost.cur_date = LAST_DAY(DATE_ADD(invoice_temp.invoice_date, INTERVAL -1 MONTH), MONTH) THEN 1
+        WHEN cost.cur_date = LAST_DAY(invoice_temp.invoice_date, MONTH) THEN 2
+        WHEN cost.cur_date = LAST_DAY(DATE_ADD(invoice_temp.invoice_date, INTERVAL -2 MONTH), MONTH) THEN 3
+        WHEN cost.cur_date = LAST_DAY(DATE_ADD(invoice_temp.invoice_date, INTERVAL -3 MONTH), MONTH) THEN 4
+        WHEN cost.cur_date = LAST_DAY(DATE_ADD(invoice_temp.invoice_date, INTERVAL -4 MONTH), MONTH) THEN 5
+        ELSE 9
+      END AS cost_order,                                                          -- MapInvoiceDateToPartCostDate.CostOrder - used for some kind of order
+    FROM 
+      (SELECT DISTINCT part_db_id, invoice_date FROM invoice_temp) AS invoice_temp
+    LEFT JOIN
+      (SELECT DISTINCT cur_date, part_db_id FROM `palziv-data-prod.modeling.modeling_fact_cost`) AS cost ON invoice_temp.part_db_id = cost.part_db_id 
+    WHERE cost.cur_date IN (
+      LAST_DAY(DATE_ADD(invoice_temp.invoice_date, INTERVAL -1 MONTH), MONTH),
+      LAST_DAY(invoice_temp.invoice_date, MONTH),
+      LAST_DAY(DATE_ADD(invoice_temp.invoice_date, INTERVAL -2 MONTH), MONTH),
+      LAST_DAY(DATE_ADD(invoice_temp.invoice_date, INTERVAL -3 MONTH), MONTH),
+      LAST_DAY(DATE_ADD(invoice_temp.invoice_date, INTERVAL -4 MONTH), MONTH))
+  ), invoice_to_part_cost AS (
+    SELECT DISTINCT
+      pc1.part_db_id, 
+      pc1.inv_end_month,
+      pc1.cur_date
+    FROM invoice_to_part_cost_temp AS pc1 
+    JOIN (
+      SELECT 
+        part_db_id,
+        MIN(cost_order) AS cost_order,
+        inv_end_month
+      FROM invoice_to_part_cost_temp
+      GROUP BY part_db_id, inv_end_month
+    ) AS pc2 ON pc1.part_db_id = pc2.part_db_id AND pc1.inv_end_month = pc2.inv_end_month AND pc1.cost_order = pc2.cost_order 
+  ), invoice_temp_2 AS (
+    SELECT 
+      invoice_temp.part_db_id,                                                    -- InvoiceItems.PartKey
+      invoice_temp.invoice_db_id,                                                 -- Invoice.InvKey
+      invoice_temp.db_id,                                                         -- Invoices.DB
+      invoice_temp.invoice_number,                                                -- Invoice_#
+      invoice_temp.invoice_date,                                                  -- Invoices.Date 
+      invoice_temp.pay_date,                                                      -- Invoices.PayDate
+      invoice_temp.i_updated_at,                                                  -- Invoices.ItemsUDate
+      invoice_temp.line,                                                          -- Invoices.Line	
+      invoice_temp.unit_price,                                                    -- Invoices.UnitPrice	
+      invoice_temp.prsource,                                                      -- Invoices.PRSource	
+      invoice_temp.type,                                                          -- Invoices.Type
+      invoice_temp.currency_id,                                                   -- Invoices.Currency
+      invoice_temp.i_currency,                                                    -- Invoices.ICurrency
+      CASE 
+        WHEN invoice_temp.i_currency = -1 THEN 1
+        ELSE invoice_temp.i_exchange
+      END AS invoice_i_exch_rate,                                                 -- Inv_IExchRate
+      invoice_temp.exchange_3,                                                    -- Invoices.Exchange3
+      invoice_temp.exchange_rate,                                                 -- Invoices.Exchange
+      invoice_temp.cur_date AS curreg_cur_date,                                   -- Invoices.CurregCurDate
+      invoice_temp.exchange,                                                      -- Invoices.CurregExchange
+      invoice_temp.currency3,                                                     -- FncCurrency3
+      invoice_temp.cur_code,                                                      -- Inv_Curr
+      invoice_temp.credit_or_debit,                                               -- Invoices.CreditOrDebit
+      invoice_temp.debit,                                                         -- Invoices.Debit
+      invoice_temp.tot_percent,                                                   -- Invoices.TotPercent 
+      invoice_temp.customer_id,                                                   -- Invoices.Cust
+      invoice_temp.details,                                                       -- Invoices.Details                     
+      invoice_temp.h_cur_code,                                                    -- Invoices.Head_CurrCode
+      invoice_temp.currency_name,                                                 -- Invoices.Head_CurrName
+      CASE 
+        WHEN invoice_temp.exchange > 0 THEN invoice_temp.exchange
+        ELSE invoice_temp.exchange_rate
+      END AS invoice_exch_rate,                                                   -- Inv_ExchRate
+      invoice_temp.unit_name,                                                     -- Invoices.Unit#
+      invoice_temp.unit_description,                                              -- Invoices.Unit
+      invoice_temp.english_unit_description,                                      -- Invoices.EUnitDes
+      CASE 
+        WHEN invoice_temp.credit_or_debit = 1 THEN invoice_temp.t_quant
+        ELSE -1 * invoice_temp.t_quant
+      END AS t_quant,                                                             -- Invoices.TQuant
+      invoice_temp.ztsv_cost_quant,                                               -- Invoiceitems.ZTSV_COSTQUANT => For new feature
+      invoice_temp.ztsv_stdfun_cost,                                              -- Invoiceitems.ZTSV_STDFUNCCOST => For new fature
+      invoice_temp.conversion_rate,                                               -- Part.Conv => For new feature
+      invoice_temp.q_price_2,                                                     -- Invoices.QPrice2		
+      invoice_temp.iv_cost,                                                       -- Invoices.IvCost	
+      invoice_temp.status_descripsion,                                            -- Invoices.Status
+      invoice_temp.status_id,                                                     -- Invoices.IvStat
+      invoice_temp.is_canceled,                                                   -- Invoices.Canceled?
+      invoice_temp.english_invoice_descripsion AS invoice_type,                   -- Iv_Type
+      invoice_temp.h_t_percent,                                                   -- Inviices.HeaderTPercent
+      invoice_temp.i_t_percent,                                                   -- Invoices.ItemsTPercent
+      invoice_temp.unit_cost,                                                     -- Invoices.UnitCost
+      invoice_temp.unit_std_cost,                                                 -- Invoices.UnitStdCost
+      invoice_temp.part_final_conv,                                               -- Invoices.UnitFinalConv
+      invoice_temp.part_non_standard,                                             -- Invoices.PartNonStandard
+      invoice_temp.qv_sales_filter,                                               -- Invoices.FamilyFilterFlag  
+      invoice_temp.account_name,                                                  -- Invoices.AccountName
+      invoice_temp.account_descripsion,                                           -- Invoices.AccountDes
+      invoice_temp.ztsv_ic_code,                                                  -- Invoices.AccountIntercompanyFlag
+      invoice_temp.reference,                                                     -- Invoices.Orders_CustPO
+      invoice_temp.zpal_pack_flag,                                                -- Invoices.PalzivPackingTradeFlag
+      invoice_temp.ztsv_volin_cont_cbm,                                           -- Invoices.PartVolumeInContainerM3
+      invoice_temp.ztsv_cont_cost,                                                -- Invoices.ContainerCostCompanyMainCurr
+      invoice_temp.usd,                                                           -- Invoices.USD
+      invoice_temp.gbp,                                                           -- Invoices.GBP
+      invoice_temp.euro,                                                          -- Invoices.EURO
+      invoice_temp.ron,                                                           -- Invoices.RON
+      invoice_temp.mxn,                                                           -- Invoices.MXN
+      invoice_temp.invoice_id,                                                    -- Invoice.IV
+      invoice_temp.part_id,                                                       -- Invoices.Part
+      invoice_temp.agent_id,                                                      -- Invoices.Agent
+      cost.cur_date,                                                              -- InvoicesDetailedCost.Curdate
+      cost.total,                                                                 -- InvoicesDetailedCost.Total
+      cost.raw_material,                                                          -- InvoicesDetailedCost.RawMaterial
+      cost.wkc_1,                                                                 -- InvoicesDetailedCost.WorkCenter
+      cost.emp_1,                                                                 -- InvoicesDetailedCost.Employees
+      cost.sup_1,                                                                 -- InvoicesDetailedCost.Sup
+      cost.part_date_db_id,                                                       -- MapInvoiceDateToPartCostDate_To_Cost_Key
+      -- export_duties.export_price_per_unit,                                        -- Invoices.ExportPricePerUnit
+    FROM 
+      invoice_temp
+    LEFT JOIN
+      invoice_to_part_cost ON CONCAT(invoice_temp.part_db_id, LAST_DAY(invoice_temp.invoice_date, MONTH)) = CONCAT(invoice_to_part_cost.part_db_id, invoice_to_part_cost.inv_end_month)
+    LEFT JOIN
+      `palziv-data-prod.modeling.modeling_fact_cost` AS cost ON CONCAT(invoice_to_part_cost.part_db_id, '_', invoice_to_part_cost.cur_date) = cost.part_date_db_id
+    -- LEFT JOIN
+    --   `palziv-data-prod.modeling.fact_export_duties` AS export_duties ON CONCAT(invoice_temp.part_db_id, invoice_temp.imp_file_id) = CONCAT(export_duties.part_db_id, export_duties.import_file_id)
+  ), invoice_temp_3 AS (
+    SELECT 
+      invoice_db_id,                                                              -- Invoice.InvKey
+      CONCAT(i_currency, '_', db_id) AS i_currency_db_id,
+      db_id,                                                                      -- Invoices.DB
+      invoice_number,                                                             -- Invoice_#
+      invoice_date,                                                               -- Invoices.Date 
+      pay_date,                                                                   -- Invoices.PayDate
+      i_updated_at,                                                               -- Invoices.ItemsUDate
+      line,                                                                       -- Invoices.Line	
+      unit_price,                                                                 -- Invoices.UnitPrice	
+      prsource,                                                                   -- Invoices.PRSource	
+      q_price_2,                                                                  -- Invoices.QPrice2		
+      type,                                                                       -- Invoices.Type
+      CASE 
+        WHEN currency_id = -1 THEN 1
+        ELSE invoice_exch_rate
+      END AS invoice_exch_rate,                                                   -- Inv_ExchRate
+      q_price_2 * ((100 - tot_percent) / 100) * credit_or_debit AS inv_curr_line_qprice,   -- Invoices.InvCurr_LineQPrice
+      q_price_2 * ((100 - tot_percent) / 100) * credit_or_debit * invoice_exch_rate AS company_curr_line_qprice,    -- Invoices.CompanyCurr_LineQPrice
+      unit_price * invoice_i_exch_rate AS company_curr_unit_price,                -- Invoices.CompanyCurr_UnitPrice
+      iv_cost,                                                                    -- Invoices.IvCost	
+      credit_or_debit,                                                            -- Invoices.CreditOrDebit
+      debit,                                                                      -- Invoices.Debit
+      unit_name,                                                                  -- Invoices.Unit#
+      unit_description,                                                           -- Invoices.Unit
+      english_unit_description,                                                   -- Invoices.EUnitDes
+      t_quant,                                                                    -- Invoices.TQuant
+      ztsv_cost_quant,                                                            -- Invoiceitems.ZTSV_COSTQUANT => For new feature
+      ztsv_stdfun_cost,                                                           -- Invoiceitems.ZTSV_STDFUNCCOST => For new fature
+      conversion_rate,                                                            -- Part.Conv => For new feature
+      CASE
+        WHEN ztsv_cost_quant = 0 THEN (ztsv_stdfun_cost * conversion_rate * t_quant) 
+        ELSE (ztsv_stdfun_cost * conversion_rate * t_quant) / ztsv_cost_quant
+      END AS line_std_cost,
+      invoice_i_exch_rate,                                                        -- Inv_IExchRate
+      currency_id,                                                                -- Invoices.Currency
+      i_currency,                                                                 -- Invoices.ICurrency
+      status_descripsion,                                                         -- Invoices.Status
+      status_id,                                                                  -- Invoices.IvStat
+      is_canceled,                                                                -- Invoices.Canceled?
+      invoice_type,                                                               -- Iv_Type
+      cur_code,                                                                   -- Inv_Curr
+      tot_percent,                                                                -- Invoices.TotPercent 
+      customer_id,                                                                -- Invoices.Cust
+      details,                                                                    -- Invoices.Details                     
+      h_cur_code,                                                                 -- Invoices.Head_CurrCode
+      currency_name,                                                              -- Invoices.Head_CurrName
+      part_non_standard,                                                          -- Invoices.PartNonStandard
+      qv_sales_filter,                                                            -- Invoices.FamilyFilterFlag  
+      account_name,                                                               -- Invoices.AccountName
+      account_descripsion,                                                        -- Invoices.AccountDes
+      ztsv_ic_code,                                                               -- Invoices.AccountIntercompanyFlag
+      reference,                                                                  -- Invoices.Orders_CustPO
+      zpal_pack_flag,                                                             -- Invoices.PalzivPackingTradeFlag
+      ztsv_volin_cont_cbm,                                                        -- Invoices.PartVolumeInContainerM3
+      ztsv_cont_cost,                                                             -- Invoices.ContainerCostCompanyMainCurr
+      usd,                                                                        -- Invoices.USD
+      gbp,                                                                        -- Invoices.GBP
+      euro,                                                                       -- Invoices.EURO
+      ron,                                                                        -- Invoices.RON
+      mxn,                                                                        -- Invoices.MXN
+      unit_cost,                                                                  -- Invoices.UnitCost
+      unit_std_cost,                                                              -- Invoices.UnitStdCost
+      part_final_conv,                                                            -- Invoices.UnitFinalConv
+      unit_cost * t_quant AS line_cost,                                           -- Invoices.LineCost
+      unit_std_cost * t_quant AS p_line_std_cost,                                   -- Invoices.LineStdCost
+      cur_date AS dc_date,                                                        -- Invoices.DCDate
+      total * part_final_conv * t_quant AS dc_line_total,                         -- Invoices.DCLineTotal
+      raw_material * part_final_conv * t_quant AS dc_line_raw_material,           -- Invoices.DCLineRawMaterial
+      wkc_1 * part_final_conv * t_quant AS dc_line_work_center,                   -- Invoices.DCLineWorkCenter
+      emp_1 * part_final_conv * t_quant AS dc_line_employees,                     -- Invoices.DCLineEmployees
+      sup_1 * part_final_conv * t_quant AS dc_line_sup,                           -- Invoices.DCLineSup
+      -- export_price_per_unit * t_quant AS line_export_price,                       -- Invoices.LineExportPrice
+      invoice_id,                                                                 -- Invoice.IV
+      part_id,                                                                    -- Invoices.Part
+      agent_id,                                                                   -- Invoices.Agent
+    FROM 
+      invoice_temp_2
+  ), invoice_temp_4 AS (
+    SELECT 
+      -- InvoicesToAggregatedIvLinesKey
+      -- SalesKeyTableToInvoicesKey
+      -- Invoices.AccountGroupCompany
+      -- Invoices.AccountCompany
+      invoice_db_id,                                                              -- Invoice.InvKey
+      db_id,                                                                      -- Invoices.DB
+      CAST(part_id AS STRING) AS part_id,                                         -- Invoices.Part
+      invoice_number,                                                             -- Invoice_#
+      invoice_date,                                                               -- Invoices.Date 
+      pay_date,                                 -- Invoices.PayDate
+      DATE(i_updated_at) AS i_updated_at,                                         -- Invoices.ItemsUDate
+      line,                                                                       -- Invoices.Row#	
+      unit_price,                                                                 -- Invoices.UnitPrice	
+      prsource,                                                                   -- Invoices.PRSource	
+      q_price_2,                                                                  -- Invoices.QPrice2		
+      iv_cost,                                                                    -- Invoices.IvCost	
+      type,                                                                       -- Invoices.Type
+      invoice_exch_rate,                                                          -- Inv_ExchRate
+      debit,                                                                      -- Invoices.Debit
+      unit_name,                                                                  -- Invoices.Unit#
+      unit_description,                                                           -- Invoices.Unit
+      english_unit_description,                                                   -- Invoices.EUnitDes
+      t_quant,                                                                    -- Invoices.TQuant
+      ztsv_cost_quant,                                                            -- Invoiceitems.ZTSV_COSTQUANT => For new feature
+      ztsv_stdfun_cost,                                                           -- Invoiceitems.ZTSV_STDFUNCCOST => For new fature
+      conversion_rate,                                                            -- Part.Conv => For new feature
+      tot_percent,                                                                -- Invoices.TotPercent 
+      details,                                                                    -- Invoices.Details 
+      h_cur_code,                                                                 -- Invoices.Head_CurrCode
+      currency_name,                                                              -- Invoices.Head_CurrName
+      inv_curr_line_qprice,                                                       -- Invoices.InvCurr_LineQPrice
+      invoice_i_exch_rate,                                                        -- Inv_IExchRate
+      currency_id,                                                                -- Invoices.Currency
+      i_currency,                                                                 -- Invoices.ICurrency
+      status_descripsion,                                                         -- Invoices.Status
+      status_id,                                                                  -- Invoices.IvStat
+      is_canceled,                                                                -- Invoices.Canceled?
+      invoice_type,                                                               -- Iv_Type
+      cur_code,                                                                   -- Inv_Curr
+      CAST(customer_id AS STRING) AS customer_id,                                 -- Invoices.Cust
+      dc_date,                                                                    -- Invoices.DCDate
+      ztsv_cont_cost,                                                             -- Invoices.ContainerCostCompanyMainCurr
+      part_non_standard,                                                          -- Invoices.PartNonStandard
+      qv_sales_filter,                                                            -- Invoices.FamilyFilterFlag  
+      account_name,                                                               -- Invoices.AccountName
+      account_descripsion,                                                        -- Invoices.AccountDes
+      ztsv_ic_code,                                                               -- Invoices.AccountIntercompanyFlag
+      reference,                                                                  -- Invoices.Orders_CustPO
+      zpal_pack_flag,                                                             -- Invoices.PalzivPackingTradeFlag
+      ztsv_volin_cont_cbm,                                                        -- Invoices.PartVolumeInContainerM3
+      invoice_id,                                                                 -- Invoice.IV
+      CAST(agent_id AS STRING) AS agent_id,                                       -- Invoices.Agent
+      ------------- Unit Price Exchanges -------------
+      CASE
+        WHEN i_currency_db_id IN ('pna_-2','puk_-2', 'fomsrl_42', 'tropal_42', 'fommex_42', 'palmex_42') THEN unit_price
+        WHEN db_id IN ('palziv', 'foamot') THEN company_curr_unit_price
+        WHEN db_id IN ('pna') THEN company_curr_unit_price * usd
+        WHEN db_id IN ('puk') THEN company_curr_unit_price * gbp
+        WHEN db_id IN ('fomsrl', 'tropal') THEN company_curr_unit_price * ron
+        ELSE company_curr_unit_price * mxn
+      END AS unit_price_nis,                                                      -- Invoices.UnitPriceNIS
+      CASE
+        WHEN i_currency_db_id IN ('palziv_-2','foamot_-2', 'puk_109', 'fomsrl_109', 'tropal_109', 'fommex_-2', 'palmex_-2') THEN unit_price
+        WHEN db_id IN ('palziv', 'foamot') THEN company_curr_unit_price / usd
+        WHEN db_id IN ('pna') THEN company_curr_unit_price
+        WHEN db_id IN ('puk') THEN company_curr_unit_price * gbp / usd
+        WHEN db_id IN ('fomsrl', 'tropal') THEN company_curr_unit_price * ron / usd
+        ELSE company_curr_unit_price * mxn / usd
+      END AS unit_price_usd,                                                      -- Invoices.UnitPriceUSD
+      CASE
+        WHEN i_currency_db_id IN ('palziv_30','foamot_30', 'pna_30', 'fomsrl_30', 'tropal_30', 'fommex_30', 'palmex_30') THEN unit_price
+        WHEN db_id IN ('palziv', 'foamot') THEN company_curr_unit_price / gbp
+        WHEN db_id IN ('pna') THEN company_curr_unit_price * usd / gbp
+        WHEN db_id IN ('puk') THEN company_curr_unit_price 
+        WHEN db_id IN ('fomsrl', 'tropal') THEN company_curr_unit_price * ron / gbp
+        ELSE company_curr_unit_price * mxn / gbp
+      END AS unit_price_gbp,                                                      -- Invoices.UnitPriceGBP
+      CASE
+        WHEN i_currency_db_id IN ('palziv_29','foamot_29', 'pna_29', 'puk_29', 'fomsrl_-2', 'tropal_-2', 'fommex_109', 'palmex_109') THEN unit_price
+        WHEN db_id IN ('palziv', 'foamot') THEN company_curr_unit_price / euro
+        WHEN db_id IN ('pna') THEN company_curr_unit_price * usd / euro
+        WHEN db_id IN ('puk') THEN company_curr_unit_price * gbp / euro
+        WHEN db_id IN ('fomsrl', 'tropal') THEN company_curr_unit_price * ron / euro 
+        ELSE company_curr_unit_price * mxn / euro
+      END AS unit_price_euro,                                                     -- Invoices.UnitPriceEUR
+      ------------- Line Total -------------
+      CASE
+        WHEN i_currency_db_id IN ('pna_-2','puk_-2', 'fomsrl_42', 'tropal_42', 'fommex_42', 'palmex_42') THEN inv_curr_line_qprice
+        WHEN db_id IN ('palziv', 'foamot') THEN company_curr_line_qprice
+        WHEN db_id IN ('pna') THEN company_curr_line_qprice * usd
+        WHEN db_id IN ('puk') THEN company_curr_line_qprice * gbp
+        WHEN db_id IN ('fomsrl', 'tropal') THEN company_curr_line_qprice * ron
+        ELSE company_curr_line_qprice * mxn
+      END AS line_total_nis,                                                      -- Invoices.LineTotalNIS
+      CASE
+        WHEN i_currency_db_id IN ('pna_-2','puk_-2', 'fomsrl_42', 'tropal_42', 'fommex_42', 'palmex_42') THEN inv_curr_line_qprice
+        WHEN db_id IN ('palziv', 'foamot') THEN company_curr_line_qprice / usd
+        WHEN db_id IN ('pna') THEN company_curr_line_qprice
+        WHEN db_id IN ('puk') THEN company_curr_line_qprice * gbp / usd
+        WHEN db_id IN ('fomsrl', 'tropal') THEN company_curr_line_qprice * ron / usd
+        ELSE company_curr_line_qprice * mxn / usd
+      END AS line_total_usd,                                                      -- Invoices.LineTotalUSD
+      CASE
+        WHEN i_currency_db_id IN ('pna_-2','puk_-2', 'fomsrl_42', 'tropal_42', 'fommex_42', 'palmex_42') THEN inv_curr_line_qprice
+        WHEN db_id IN ('palziv', 'foamot') THEN company_curr_line_qprice / gbp
+        WHEN db_id IN ('pna') THEN company_curr_line_qprice * usd / gbp
+        WHEN db_id IN ('puk') THEN company_curr_line_qprice
+        WHEN db_id IN ('fomsrl', 'tropal') THEN company_curr_line_qprice * ron / gbp
+        ELSE company_curr_line_qprice * mxn / gbp
+      END AS line_total_gbp,                                                      -- Invoices.LineTotalGBP
+      CASE
+        WHEN i_currency_db_id IN ('pna_-2','puk_-2', 'fomsrl_42', 'tropal_42', 'fommex_42', 'palmex_42') THEN inv_curr_line_qprice
+        WHEN db_id IN ('palziv', 'foamot') THEN company_curr_line_qprice / euro
+        WHEN db_id IN ('pna') THEN company_curr_line_qprice * usd / euro
+        WHEN db_id IN ('puk') THEN company_curr_line_qprice * gbp / euro
+        WHEN db_id IN ('fomsrl', 'tropal') THEN company_curr_line_qprice * ron / euro
+        ELSE company_curr_line_qprice * mxn / euro
+      END AS line_total_euro,                                                     -- Invoices.LineTotalEUR                                                  
+      ------------- Line Cost -------------
+      CASE
+        WHEN db_id IN ('palziv', 'foamot') THEN line_cost
+        WHEN db_id IN ('pna') THEN line_cost * usd
+        WHEN db_id IN ('puk') THEN line_cost * gbp
+        WHEN db_id IN ('fomsrl', 'tropal') THEN line_cost * ron
+        ELSE line_cost * mxn
+      END AS line_cost_nis,                                                       -- Invoices.LineCostNIS
+      CASE
+        WHEN db_id IN ('palziv', 'foamot') THEN line_cost / usd
+        WHEN db_id IN ('pna') THEN line_cost 
+        WHEN db_id IN ('puk') THEN line_cost * gbp / usd
+        WHEN db_id IN ('fomsrl', 'tropal') THEN line_cost * ron / usd
+        ELSE line_cost * mxn / usd
+      END AS line_cost_usd,                                                       -- Invoices.LineCostUSD
+      CASE
+        WHEN db_id IN ('palziv', 'foamot') THEN line_cost / gbp
+        WHEN db_id IN ('pna') THEN line_cost * usd / gbp
+        WHEN db_id IN ('puk') THEN line_cost 
+        WHEN db_id IN ('fomsrl', 'tropal') THEN line_cost * ron / gbp
+        ELSE line_cost * mxn / gbp
+      END AS line_cost_gbp,                                                       -- Invoices.LineCostGBP
+      CASE
+        WHEN db_id IN ('palziv', 'foamot') THEN line_cost / euro
+        WHEN db_id IN ('pna') THEN line_cost * usd / euro
+        WHEN db_id IN ('puk') THEN line_cost * gbp / euro
+        WHEN db_id IN ('fomsrl', 'tropal') THEN line_cost * ron / euro
+        ELSE line_cost * mxn / euro
+      END AS line_cost_euro,                                                      -- Invoices.LineCostEUR
+      ------------- Line Std Cost -------------
+      CASE
+        WHEN db_id IN ('palziv', 'foamot') THEN line_std_cost
+        WHEN db_id IN ('pna') THEN line_std_cost * usd
+        WHEN db_id IN ('puk') THEN line_std_cost * gbp
+        WHEN db_id IN ('fomsrl', 'tropal') THEN line_std_cost * ron
+        ELSE line_std_cost * mxn
+      END AS line_std_cost_nis,                                                   -- Invoices.LineStdCostNIS
+      CASE
+        WHEN db_id IN ('palziv', 'foamot') THEN line_std_cost / usd
+        WHEN db_id IN ('pna') THEN line_std_cost 
+        WHEN db_id IN ('puk') THEN line_std_cost * gbp / usd
+        WHEN db_id IN ('fomsrl', 'tropal') THEN line_std_cost * ron / usd
+        ELSE line_std_cost * mxn / usd
+      END AS line_std_cost_usd,                                                   -- Invoices.LineStdCostUSD
+      CASE
+        WHEN db_id IN ('palziv', 'foamot') THEN line_std_cost / gbp
+        WHEN db_id IN ('pna') THEN line_std_cost * usd / gbp
+        WHEN db_id IN ('puk') THEN line_std_cost 
+        WHEN db_id IN ('fomsrl', 'tropal') THEN line_std_cost * ron / gbp
+        ELSE line_std_cost * mxn / gbp
+      END AS line_std_cost_gbp,                                                   -- Invoices.LineStdCostGBP
+      CASE
+        WHEN db_id IN ('palziv', 'foamot') THEN line_std_cost / euro
+        WHEN db_id IN ('pna') THEN line_std_cost * usd / euro
+        WHEN db_id IN ('puk') THEN line_std_cost * gbp / euro
+        WHEN db_id IN ('fomsrl', 'tropal') THEN line_std_cost * ron / euro
+        ELSE line_std_cost * mxn / euro
+      END AS line_std_cost_euro,                                                  -- Invoices.LineStdCostEUR
+      ------------- Line Std Cost - Previous -------------
+      CASE
+        WHEN db_id IN ('palziv', 'foamot') THEN p_line_std_cost
+        WHEN db_id IN ('pna') THEN p_line_std_cost * usd
+        WHEN db_id IN ('puk') THEN p_line_std_cost * gbp
+        WHEN db_id IN ('fomsrl', 'tropal') THEN p_line_std_cost * ron
+        ELSE p_line_std_cost * mxn
+      END AS p_line_std_cost_nis,                                                   -- Invoices.LineStdCostNIS
+      CASE
+        WHEN db_id IN ('palziv', 'foamot') THEN p_line_std_cost / usd
+        WHEN db_id IN ('pna') THEN p_line_std_cost 
+        WHEN db_id IN ('puk') THEN p_line_std_cost * gbp / usd
+        WHEN db_id IN ('fomsrl', 'tropal') THEN p_line_std_cost * ron / usd
+        ELSE p_line_std_cost * mxn / usd
+      END AS p_line_std_cost_usd,                                                   -- Invoices.LineStdCostUSD
+      CASE
+        WHEN db_id IN ('palziv', 'foamot') THEN p_line_std_cost / gbp
+        WHEN db_id IN ('pna') THEN p_line_std_cost * usd / gbp
+        WHEN db_id IN ('puk') THEN p_line_std_cost 
+        WHEN db_id IN ('fomsrl', 'tropal') THEN p_line_std_cost * ron / gbp
+        ELSE p_line_std_cost * mxn / gbp
+      END AS p_line_std_cost_gbp,                                                   -- Invoices.LineStdCostGBP
+      CASE
+        WHEN db_id IN ('palziv', 'foamot') THEN p_line_std_cost / euro
+        WHEN db_id IN ('pna') THEN p_line_std_cost * usd / euro
+        WHEN db_id IN ('puk') THEN p_line_std_cost * gbp / euro
+        WHEN db_id IN ('fomsrl', 'tropal') THEN p_line_std_cost * ron / euro
+        ELSE p_line_std_cost * mxn / euro
+      END AS p_line_std_cost_euro,                                          -- Invoices.LineStdCostEUR
+      ------------- Unit Cost -------------
+      CASE
+        WHEN db_id IN ('palziv', 'foamot') THEN unit_cost
+        WHEN db_id IN ('pna') THEN unit_cost * usd
+        WHEN db_id IN ('puk') THEN unit_cost * gbp
+        WHEN db_id IN ('fomsrl', 'tropal') THEN unit_cost * ron
+        ELSE unit_cost * mxn
+      END AS unit_cost_nis,                                                       -- Invoices.UnitCostNIS
+      CASE
+        WHEN db_id IN ('palziv', 'foamot') THEN unit_cost / usd
+        WHEN db_id IN ('pna') THEN unit_cost 
+        WHEN db_id IN ('puk') THEN unit_cost * gbp / usd
+        WHEN db_id IN ('fomsrl', 'tropal') THEN unit_cost * ron / usd
+        ELSE unit_cost * mxn / usd
+      END AS unit_cost_usd,                                                       -- Invoices.UnitCostUSD
+      CASE
+        WHEN db_id IN ('palziv', 'foamot') THEN unit_cost / gbp
+        WHEN db_id IN ('pna') THEN unit_cost * usd / gbp
+        WHEN db_id IN ('puk') THEN unit_cost 
+        WHEN db_id IN ('fomsrl', 'tropal') THEN unit_cost * ron / gbp
+        ELSE unit_cost * mxn / gbp
+      END AS unit_cost_gbp,                                                       -- Invoices.UnitCostGBP
+      CASE
+        WHEN db_id IN ('palziv', 'foamot') THEN unit_cost / euro
+        WHEN db_id IN ('pna') THEN unit_cost * usd / euro
+        WHEN db_id IN ('puk') THEN unit_cost * gbp / euro
+        WHEN db_id IN ('fomsrl', 'tropal') THEN unit_cost * ron / euro
+        ELSE unit_cost * mxn / euro
+      END AS unit_cost_euro,                                                      -- Invoices.UnitCostEUR
+      ------------- Unit Std Cost -------------
+      CASE
+        WHEN db_id IN ('palziv', 'foamot') THEN unit_std_cost
+        WHEN db_id IN ('pna') THEN unit_std_cost * usd
+        WHEN db_id IN ('puk') THEN unit_std_cost * gbp
+        WHEN db_id IN ('fomsrl', 'tropal') THEN unit_std_cost * ron
+        ELSE unit_std_cost * mxn
+      END AS unit_std_cost_nis,                                                   -- Invoices.UnitStdCostNIS
+      CASE
+        WHEN db_id IN ('palziv', 'foamot') THEN unit_std_cost / usd
+        WHEN db_id IN ('pna') THEN unit_std_cost 
+        WHEN db_id IN ('puk') THEN unit_std_cost * gbp / usd
+        WHEN db_id IN ('fomsrl', 'tropal') THEN unit_std_cost * ron / usd
+        ELSE unit_std_cost * mxn / usd
+      END AS unit_std_cost_usd,                                                   -- Invoices.UnitStdCostUSD
+      CASE
+        WHEN db_id IN ('palziv', 'foamot') THEN unit_std_cost / gbp
+        WHEN db_id IN ('pna') THEN unit_std_cost * usd / gbp
+        WHEN db_id IN ('puk') THEN unit_std_cost 
+        WHEN db_id IN ('fomsrl', 'tropal') THEN unit_std_cost * ron / gbp
+        ELSE unit_std_cost * mxn / gbp
+      END AS unit_std_cost_gbp,                                                   -- Invoices.UnitStdCostGBP
+      CASE
+        WHEN db_id IN ('palziv', 'foamot') THEN unit_std_cost / euro
+        WHEN db_id IN ('pna') THEN unit_std_cost * usd / euro
+        WHEN db_id IN ('puk') THEN unit_std_cost * gbp / euro
+        WHEN db_id IN ('fomsrl', 'tropal') THEN unit_std_cost * ron / euro
+        ELSE unit_std_cost * mxn / euro
+      END AS unit_std_cost_euro,                                                  -- Invoices.UnitStdCostEUR
+      ------------- Detail Cost Convertions -------------
+      ------------------ DC Line Total ------------------
+      CASE
+        WHEN db_id IN ('palziv', 'foamot') THEN dc_line_total
+        WHEN db_id IN ('pna') THEN dc_line_total * usd
+        WHEN db_id IN ('puk') THEN dc_line_total * gbp
+        WHEN db_id IN ('fomsrl', 'tropal') THEN dc_line_total * ron
+        ELSE dc_line_total * mxn
+      END AS dc_line_total_nis,                                                   -- Invoices.DCLineTotalNIS
+      CASE
+        WHEN db_id IN ('palziv', 'foamot') THEN dc_line_total / usd
+        WHEN db_id IN ('pna') THEN dc_line_total 
+        WHEN db_id IN ('puk') THEN dc_line_total * gbp / usd
+        WHEN db_id IN ('fomsrl', 'tropal') THEN dc_line_total * ron / usd
+        ELSE dc_line_total * mxn / usd
+      END AS dc_line_total_usd,                                                   -- Invoices.DCLineTotalUSD
+      CASE
+        WHEN db_id IN ('palziv', 'foamot') THEN dc_line_total / gbp
+        WHEN db_id IN ('pna') THEN dc_line_total * usd / gbp
+        WHEN db_id IN ('puk') THEN dc_line_total 
+        WHEN db_id IN ('fomsrl', 'tropal') THEN dc_line_total * ron / gbp
+        ELSE dc_line_total * mxn / gbp
+      END AS dc_line_total_gbp,                                                   -- Invoices.DCLineTotalGBP
+      CASE
+        WHEN db_id IN ('palziv', 'foamot') THEN dc_line_total / euro
+        WHEN db_id IN ('pna') THEN dc_line_total * usd / euro
+        WHEN db_id IN ('puk') THEN dc_line_total * gbp / euro
+        WHEN db_id IN ('fomsrl', 'tropal') THEN dc_line_total * ron / euro
+        ELSE dc_line_total * mxn / euro
+      END AS dc_line_total_euro,                                                  -- Invoices.DCLineTotalEUR
+      ------------------ DC Line Row Material ------------------
+      CASE
+        WHEN db_id IN ('palziv', 'foamot') THEN dc_line_raw_material
+        WHEN db_id IN ('pna') THEN dc_line_raw_material * usd
+        WHEN db_id IN ('puk') THEN dc_line_raw_material * gbp
+        WHEN db_id IN ('fomsrl', 'tropal') THEN dc_line_raw_material * ron
+        ELSE dc_line_raw_material * mxn
+      END AS dc_line_raw_material_nis,                                            -- Invoices.DCLineRawMaterialNIS
+      CASE
+        WHEN db_id IN ('palziv', 'foamot') THEN dc_line_raw_material / usd
+        WHEN db_id IN ('pna') THEN dc_line_raw_material 
+        WHEN db_id IN ('puk') THEN dc_line_raw_material * gbp / usd
+        WHEN db_id IN ('fomsrl', 'tropal') THEN dc_line_raw_material * ron / usd
+        ELSE dc_line_raw_material * mxn / usd
+      END AS dc_line_raw_material_usd,                                            -- Invoices.DCLineRawMaterialUSD
+      CASE
+        WHEN db_id IN ('palziv', 'foamot') THEN dc_line_raw_material / gbp
+        WHEN db_id IN ('pna') THEN dc_line_raw_material * usd / gbp
+        WHEN db_id IN ('puk') THEN dc_line_raw_material 
+        WHEN db_id IN ('fomsrl', 'tropal') THEN dc_line_raw_material * ron / gbp
+        ELSE dc_line_raw_material * mxn / gbp
+      END AS dc_line_raw_material_gbp,                                            -- Invoices.DCLineRawMaterialGBP
+      CASE
+        WHEN db_id IN ('palziv', 'foamot') THEN dc_line_raw_material / euro
+        WHEN db_id IN ('pna') THEN dc_line_raw_material * usd / euro
+        WHEN db_id IN ('puk') THEN dc_line_raw_material * gbp / euro
+        WHEN db_id IN ('fomsrl', 'tropal') THEN dc_line_raw_material * ron / euro
+        ELSE dc_line_raw_material * mxn / euro
+      END AS dc_line_raw_material_euro,                                           -- Invoices.DCLineRawMaterialEUR
+      ------------------ DC Line Work Center ------------------
+      CASE
+        WHEN db_id IN ('palziv', 'foamot') THEN dc_line_work_center
+        WHEN db_id IN ('pna') THEN dc_line_work_center * usd
+        WHEN db_id IN ('puk') THEN dc_line_work_center * gbp
+        WHEN db_id IN ('fomsrl', 'tropal') THEN dc_line_work_center * ron
+        ELSE dc_line_work_center * mxn
+      END AS dc_line_work_center_nis,                                             -- Invoices.DCLineWorkCenterlNIS
+      CASE
+        WHEN db_id IN ('palziv', 'foamot') THEN dc_line_work_center / usd
+        WHEN db_id IN ('pna') THEN dc_line_work_center 
+        WHEN db_id IN ('puk') THEN dc_line_work_center * gbp / usd
+        WHEN db_id IN ('fomsrl', 'tropal') THEN dc_line_work_center * ron / usd
+        ELSE dc_line_work_center * mxn / usd
+      END AS dc_line_work_center_usd,                                             -- Invoices.DCLineWorkCenterlUSD
+      CASE
+        WHEN db_id IN ('palziv', 'foamot') THEN dc_line_work_center / gbp
+        WHEN db_id IN ('pna') THEN dc_line_work_center * usd / gbp
+        WHEN db_id IN ('puk') THEN dc_line_work_center 
+        WHEN db_id IN ('fomsrl', 'tropal') THEN dc_line_work_center * ron / gbp
+        ELSE dc_line_work_center * mxn / gbp
+      END AS dc_line_work_center_gbp,                                             -- Invoices.DCLineWorkCenterlGBP
+      CASE
+        WHEN db_id IN ('palziv', 'foamot') THEN dc_line_work_center / euro
+        WHEN db_id IN ('pna') THEN dc_line_work_center * usd / euro
+        WHEN db_id IN ('puk') THEN dc_line_work_center * gbp / euro
+        WHEN db_id IN ('fomsrl', 'tropal') THEN dc_line_work_center * ron / euro
+        ELSE dc_line_work_center * mxn / euro
+      END AS dc_line_work_center_euro,                                            -- Invoices.DCLineWorkCenterlEUR
+      ------------------ DC Line Employees ------------------
+      CASE
+        WHEN db_id IN ('palziv', 'foamot') THEN dc_line_employees
+        WHEN db_id IN ('pna') THEN dc_line_employees * usd
+        WHEN db_id IN ('puk') THEN dc_line_employees * gbp
+        WHEN db_id IN ('fomsrl', 'tropal') THEN dc_line_employees * ron
+        ELSE dc_line_employees * mxn
+      END AS dc_line_employees_nis,                                               -- Invoices.DCLineEmployeeslNIS
+      CASE
+        WHEN db_id IN ('palziv', 'foamot') THEN dc_line_employees / usd
+        WHEN db_id IN ('pna') THEN dc_line_employees 
+        WHEN db_id IN ('puk') THEN dc_line_employees * gbp / usd
+        WHEN db_id IN ('fomsrl', 'tropal') THEN dc_line_employees * ron / usd
+        ELSE dc_line_employees * mxn / usd
+      END AS dc_line_employees_usd,                                               -- Invoices.DCLineEmployeeslUSD
+      CASE
+        WHEN db_id IN ('palziv', 'foamot') THEN dc_line_employees / gbp
+        WHEN db_id IN ('pna') THEN dc_line_employees * usd / gbp
+        WHEN db_id IN ('puk') THEN dc_line_employees 
+        WHEN db_id IN ('fomsrl', 'tropal') THEN dc_line_employees * ron / gbp
+        ELSE dc_line_employees * mxn / gbp
+      END AS dc_line_employees_gbp,                                               -- Invoices.DCLineEmployeeslGBP
+      CASE
+        WHEN db_id IN ('palziv', 'foamot') THEN dc_line_employees / euro
+        WHEN db_id IN ('pna') THEN dc_line_employees * usd / euro
+        WHEN db_id IN ('puk') THEN dc_line_employees * gbp / euro
+        WHEN db_id IN ('fomsrl', 'tropal') THEN dc_line_employees * ron / euro
+        ELSE dc_line_employees * mxn / euro
+      END AS dc_line_employees_euro,                                              -- Invoices.DCLineEmployeeslEUR
+      ------------------ DC Line Sup ------------------
+      CASE
+        WHEN db_id IN ('palziv', 'foamot') THEN dc_line_sup
+        WHEN db_id IN ('pna') THEN dc_line_sup * usd
+        WHEN db_id IN ('puk') THEN dc_line_sup * gbp
+        WHEN db_id IN ('fomsrl', 'tropal') THEN dc_line_sup * ron
+        ELSE dc_line_sup * mxn
+      END AS dc_line_sup_nis,                                                     -- Invoices.DCLineSuplNIS
+      CASE
+        WHEN db_id IN ('palziv', 'foamot') THEN dc_line_sup / usd
+        WHEN db_id IN ('pna') THEN dc_line_sup 
+        WHEN db_id IN ('puk') THEN dc_line_sup * gbp / usd
+        WHEN db_id IN ('fomsrl', 'tropal') THEN dc_line_sup * ron / usd
+        ELSE dc_line_sup * mxn / usd
+      END AS dc_line_sup_usd,                                                     -- Invoices.DCLineSuplUSD
+      CASE
+        WHEN db_id IN ('palziv', 'foamot') THEN dc_line_sup / gbp
+        WHEN db_id IN ('pna') THEN dc_line_sup * usd / gbp
+        WHEN db_id IN ('puk') THEN dc_line_sup 
+        WHEN db_id IN ('fomsrl', 'tropal') THEN dc_line_sup * ron / gbp
+        ELSE dc_line_sup * mxn / gbp
+      END AS dc_line_sup_gbp,                                                     -- Invoices.DCLineSuplGBP
+      CASE
+        WHEN db_id IN ('palziv', 'foamot') THEN dc_line_sup / euro
+        WHEN db_id IN ('pna') THEN dc_line_sup * usd / euro
+        WHEN db_id IN ('puk') THEN dc_line_sup * gbp / euro
+        WHEN db_id IN ('fomsrl', 'tropal') THEN dc_line_sup * ron / euro
+        ELSE dc_line_sup * mxn / euro
+      END AS dc_line_sup_euro,                                                    -- Invoices.DCLineSuplEUR
+      ------------------ Export Duties - Line Export Price ------------------
+      -- CASE
+      --   WHEN db_id IN ('palziv', 'foamot') THEN line_export_price
+      --   WHEN db_id IN ('pna') THEN line_export_price * usd
+      --   WHEN db_id IN ('puk') THEN line_export_price * gbp
+      --   WHEN db_id IN ('fomsrl', 'tropal') THEN line_export_price * ron
+      --   ELSE line_export_price * mxn
+      -- END AS line_export_price_nis,                                               -- Invoices.LineExportPriceNIS
+      -- CASE
+      --   WHEN db_id IN ('palziv', 'foamot') THEN line_export_price / usd
+      --   WHEN db_id IN ('pna') THEN line_export_price 
+      --   WHEN db_id IN ('puk') THEN line_export_price * gbp / usd
+      --   WHEN db_id IN ('fomsrl', 'tropal') THEN line_export_price * ron / usd
+      --   ELSE line_export_price * mxn / usd
+      -- END AS line_export_price_usd,                                               -- Invoices.LineExportPriceUSD
+      -- CASE
+      --   WHEN db_id IN ('palziv', 'foamot') THEN line_export_price / gbp
+      --   WHEN db_id IN ('pna') THEN line_export_price * usd / gbp
+      --   WHEN db_id IN ('puk') THEN line_export_price 
+      --   WHEN db_id IN ('fomsrl', 'tropal') THEN line_export_price * ron / gbp
+      --   ELSE line_export_price * mxn / gbp
+      -- END AS line_export_price_gbp,                                               -- Invoices.LineExportPriceGBP
+      -- CASE
+      --   WHEN db_id IN ('palziv', 'foamot') THEN line_export_price / euro
+      --   WHEN db_id IN ('pna') THEN line_export_price * usd / euro
+      --   WHEN db_id IN ('puk') THEN line_export_price * gbp / euro
+      --   WHEN db_id IN ('fomsrl', 'tropal') THEN line_export_price * ron / euro
+      --   ELSE line_export_price * mxn / euro
+      -- END AS line_export_price_euro,                                              -- Invoices.LineExportPriceEUR
+      ------------------ Container Cost - Exchange ------------------
+      CASE
+        WHEN db_id IN ('palziv', 'foamot') THEN ztsv_cont_cost
+        WHEN db_id IN ('pna') THEN ztsv_cont_cost * usd
+        WHEN db_id IN ('puk') THEN ztsv_cont_cost * gbp
+        WHEN db_id IN ('fomsrl', 'tropal') THEN ztsv_cont_cost * ron
+        ELSE ztsv_cont_cost * mxn
+      END AS ztsv_cont_cost_nis,                                                  -- Invoices.ContainerCostNIS
+      CASE
+        WHEN db_id IN ('palziv', 'foamot') THEN ztsv_cont_cost / usd
+        WHEN db_id IN ('pna') THEN ztsv_cont_cost 
+        WHEN db_id IN ('puk') THEN ztsv_cont_cost * gbp / usd
+        WHEN db_id IN ('fomsrl', 'tropal') THEN ztsv_cont_cost * ron / usd
+        ELSE ztsv_cont_cost * mxn / usd
+      END AS ztsv_cont_cost_usd,                                                  -- Invoices.ContainerCostUSD
+      CASE
+        WHEN db_id IN ('palziv', 'foamot') THEN ztsv_cont_cost / gbp
+        WHEN db_id IN ('pna') THEN ztsv_cont_cost * usd / gbp
+        WHEN db_id IN ('puk') THEN ztsv_cont_cost 
+        WHEN db_id IN ('fomsrl', 'tropal') THEN ztsv_cont_cost * ron / gbp
+        ELSE ztsv_cont_cost * mxn / gbp
+      END AS ztsv_cont_cost_gbp,                                                  -- Invoices.ContainerCostGBP
+      CASE
+        WHEN db_id IN ('palziv', 'foamot') THEN ztsv_cont_cost / euro
+        WHEN db_id IN ('pna') THEN ztsv_cont_cost * usd / euro
+        WHEN db_id IN ('puk') THEN ztsv_cont_cost * gbp / euro
+        WHEN db_id IN ('fomsrl', 'tropal') THEN ztsv_cont_cost * ron / euro
+        ELSE ztsv_cont_cost * mxn / euro
+      END AS ztsv_cont_cost_euro,                                                 -- Invoices.ContainerCostEUR
+    FROM
+      invoice_temp_3
+    UNION ALL
+    SELECT
+      NULL AS invoice_db_id,                                                      -- Invoice.InvKey
+      db_id,                                                                      -- Invoices.DB
+      CONCAT(part_name, '_', part_descripsion) AS part_id,                        -- Invoices.Part
+      CAST(invoice_number AS STRING) as invoice_number,                           -- Invoice_#
+      date AS invoice_date,                                                       -- Invoices.Date 
+      NULL AS pay_date,                                                           -- Invoices.PayDate
+      date AS i_updated_at,                                                       -- Invoices.ItemsUDate
+      iv_row AS line,                                                             -- Invoices.Row#	
+      unit_price,                                                                 -- Invoices.UnitPrice	
+      NULL AS prsource,                                                           -- Invoices.PRSource	
+      tot_price AS q_price_2,                                                     -- Invoices.QPrice2		
+      NULL AS iv_cost,                                                            -- Invoices.IvCost	
+      NULL AS type,                                                               -- Invoices.Type
+      NULL AS invoice_exch_rate,                                                  -- Inv_ExchRate
+      NULL AS debit,                                                              -- Invoices.Debit
+      NULL AS unit_name,                                                          -- Invoices.Unit#
+      NULL AS unit_description,                                                   -- Invoices.Unit
+      NULL AS english_unit_description,                                           -- Invoices.EUnitDes
+      quant AS t_quant,                                                           -- Invoices.TQuant
+      NULL AS ztsv_cost_quant,                                                            -- Invoiceitems.ZTSV_COSTQUANT => For new feature
+      NULL AS ztsv_stdfun_cost,                                                           -- Invoiceitems.ZTSV_STDFUNCCOST => For new fature
+      NULL AS conversion_rate,                                                            -- Part.Conv => For new feature
+      NULL AS tot_percent,                                                        -- Invoices.TotPercent 
+      NULL AS details,                                                            -- Invoices.Details 
+      NULL AS h_cur_code,                                                         -- Invoices.Head_CurrCode
+      NULL AS currency_name,                                                      -- Invoices.Head_CurrName
+      tot_price AS inv_curr_line_qprice,                                          -- Invoices.InvCurr_LineQPrice
+      NULL AS invoice_i_exch_rate,                                                -- Inv_IExchRate
+      NULL AS currency_id,                                                        -- Invoices.Currency
+      NULL AS i_currency,                                                         -- Invoices.ICurrency
+      'PxlFinal' AS status_descripsion,                                           -- Invoices.Status
+      1 AS status_id,                                                             -- Invoices.IvStat
+      0 AS is_canceled,                                                           -- Invoices.Canceled?
+      NULL AS invoice_type,                                                       -- Iv_Type
+      curr_code AS cur_code,                                                      -- Inv_Curr
+      customer_descripsion AS customer_id,                                        -- Invoices.Cust
+      NULL AS dc_date,                                                            -- Invoices.DCDate
+      NULL AS ztsv_cont_cost,                                                     -- Invoices.ContainerCostCompanyMainCurr
+      NULL AS part_non_standard,                                                  -- Invoices.PartNonStandard
+      NULL AS qv_sales_filter,                                                    -- Invoices.FamilyFilterFlag  
+      NULL AS account_name,                                                       -- Invoices.AccountName
+      NULL AS account_descripsion,                                                -- Invoices.AccountDes
+      NULL AS ztsv_ic_code,                                                       -- Invoices.AccountIntercompanyFlag
+      NULL AS reference,                                                          -- Invoices.Orders_CustPO
+      0 AS zpal_pack_flag,                                                        -- Invoices.PalzivPackingTradeFlag
+      NULL AS ztsv_volin_cont_cbm,                                                -- Invoices.PartVolumeInContainerM3
+      NULL AS invoice_id,                                                         -- Invoice.IV
+      salesman AS agent_id,                                                       -- Invoices.Agent
+      unit_price_nis,                                                             -- Invoices.UnitPriceNIS
+      unit_price_usd,                                                             -- Invoices.UnitPriceUSD
+      unit_price_gbp,                                                             -- Invoices.UnitPriceGBP
+      unit_price_euro,                                                            -- Invoices.UnitPriceEUR
+      IFNULL(line_total_nis, 0) AS line_total_nis,                                -- Invoices.LineTotalNIS
+      IFNULL(line_total_usd, 0) AS line_total_usd,                                -- Invoices.LineTotalUSD
+      IFNULL(line_total_gbp, 0) AS line_total_gbp,                                -- Invoices.LineTotalGBP
+      IFNULL(line_total_euro, 0) AS line_total_euro,                              -- Invoices.LineTotalEUR                                        
+      IFNULL(line_cost_nis, 0) AS line_cost_nis,                                  -- Invoices.LineCostNIS
+      IFNULL(line_cost_usd, 0) AS line_cost_usd,                                  -- Invoices.LineCostUSD
+      IFNULL(line_cost_gbp, 0) AS line_cost_gbp,                                  -- Invoices.LineCostGBP
+      IFNULL(line_cost_euro, 0)AS line_cost_euro,                                 -- Invoices.LineCostEUR
+      IFNULL(line_cost_nis, 0) AS line_std_cost_nis,                              -- Invoices.LineStdCostNIS
+      IFNULL(line_cost_usd, 0) AS line_std_cost_usd,                              -- Invoices.LineStdCostUSD
+      IFNULL(line_cost_gbp, 0) AS line_std_cost_gbp,                              -- Invoices.LineStdCostGBP
+      IFNULL(line_cost_euro, 0) AS line_std_cost_euro,                            -- Invoices.LineStdCostEUR
+      IFNULL(line_cost_nis, 0) AS p_line_std_cost_nis,                            -- Invoices.LineStdCostNIS
+      IFNULL(line_cost_usd, 0) AS p_line_std_cost_usd,                            -- Invoices.LineStdCostUSD
+      IFNULL(line_cost_gbp, 0) AS p_line_std_cost_gbp,                            -- Invoices.LineStdCostGBP
+      IFNULL(line_cost_euro, 0) AS p_line_std_cost_euro,                          -- Invoices.LineStdCostEUR
+      unit_cost_nis,                                                              -- Invoices.UnitCostNIS
+      unit_cost_usd,                                                              -- Invoices.UnitCostUSD
+      unit_cost_gbp,                                                              -- Invoices.UnitCostGBP
+      unit_cost_euro,                                                             -- Invoices.UnitCostEUR
+      NULL AS unit_std_cost_nis,                                                  -- Invoices.UnitStdCostNIS
+      NULL AS unit_std_cost_usd,                                                  -- Invoices.UnitStdCostUSD
+      NULL AS unit_std_cost_gbp,                                                  -- Invoices.UnitStdCostGBP
+      NULL AS unit_std_cost_euro,                                                 -- Invoices.UnitStdCostEUR
+      NULL AS dc_line_total_nis,                                                  -- Invoices.DCLineTotalNIS
+      NULL AS dc_line_total_usd,                                                  -- Invoices.DCLineTotalUSD
+      NULL AS dc_line_total_gbp,                                                  -- Invoices.DCLineTotalGBP
+      NULL AS dc_line_total_euro,                                                 -- Invoices.DCLineTotalEUR
+      NULL AS dc_line_raw_material_nis,                                           -- Invoices.DCLineRawMaterialNIS
+      NULL AS dc_line_raw_material_usd,                                           -- Invoices.DCLineRawMaterialUSD
+      NULL AS dc_line_raw_material_gbp,                                           -- Invoices.DCLineRawMaterialGBP
+      NULL AS dc_line_raw_material_euro,                                          -- Invoices.DCLineRawMaterialEUR
+      NULL AS dc_line_work_center_nis,                                            -- Invoices.DCLineWorkCenterlNIS
+      NULL AS dc_line_work_center_usd,                                            -- Invoices.DCLineWorkCenterlUSD
+      NULL AS dc_line_work_center_gbp,                                            -- Invoices.DCLineWorkCenterlGBP
+      NULL AS dc_line_work_center_euro,                                           -- Invoices.DCLineWorkCenterlEUR
+      NULL AS dc_line_employees_nis,                                              -- Invoices.DCLineEmployeeslNIS
+      NULL AS dc_line_employees_usd,                                              -- Invoices.DCLineEmployeeslUSD
+      NULL AS dc_line_employees_gbp,                                              -- Invoices.DCLineEmployeeslGBP
+      NULL AS dc_line_employees_euro,                                             -- Invoices.DCLineEmployeeslEUR
+      NULL AS dc_line_sup_nis,                                                    -- Invoices.DCLineSuplNIS
+      NULL AS dc_line_sup_usd,                                                    -- Invoices.DCLineSuplUSD
+      NULL AS dc_line_sup_gbp,                                                    -- Invoices.DCLineSuplGBP
+      NULL AS dc_line_sup_euro,                                                   -- Invoices.DCLineSuplEUR
+      -- NULL AS line_export_price_nis,                                              -- Invoices.LineExportPriceNIS
+      -- NULL AS line_export_price_usd,                                              -- Invoices.LineExportPriceUSD
+      -- NULL AS line_export_price_gbp,                                              -- Invoices.LineExportPriceGBP
+      -- NULL AS line_export_price_euro,                                             -- Invoices.LineExportPriceEUR
+      NULL AS ztsv_cont_cost_nis,                                                 -- Invoices.ContainerCostNIS
+      NULL AS ztsv_cont_cost_usd,                                                 -- Invoices.ContainerCostUSD
+      NULL AS ztsv_cont_cost_gbp,                                                 -- Invoices.ContainerCostGBP
+      NULL AS ztsv_cont_cost_euro,                                                -- Invoices.ContainerCostEUR
+    FROM 
+      `palziv-data-prod.modeling.modeling_fact_pxl_invoices`
+    WHERE invoice_number IS NOT NULL
+  )
+SELECT 
+  IFNULL(invoice_db_id, 'Unknown') AS invoice_db_id,                          -- Invoice.InvKey
+  IFNULL(CONCAT(db_id, '_', agent_id), 'Unknown') AS agent_db_id,
+  CONCAT(db_id, '_', invoice_number, '_', line) AS invoice_number_line_db_id,
+  CONCAT(db_id, '_', invoice_number) AS invoice_number_db_id,
+  CONCAT(db_id, '_', part_id) AS part_db_id,
+  CONCAT(db_id, '_', customer_id) AS customer_db_id,
+  db_id,                                                                      -- Invoices.DB
+  invoice_id,                                                                 -- Invoice.IV
+  agent_id,                                                                   -- Invoices.Agent
+  customer_id,                                                                -- Invoices.Cust
+  part_id,                                                                    -- Invoices.Part
+  invoice_number,                                                             -- Invoice_#
+  invoice_date,                                                               -- Invoices.Date 
+  pay_date,                                                                   -- Invoices.PayDate
+  i_updated_at,                                                               -- Invoices.ItemsUDate
+  line,                                                                       -- Invoices.Row#	
+  unit_price,                                                                 -- Invoices.UnitPrice	
+  prsource,                                                                   -- Invoices.PRSource	
+  q_price_2,                                                                  -- Invoices.QPrice2		
+  iv_cost,                                                                    -- Invoices.IvCost	
+  type,                                                                       -- Invoices.Type
+  invoice_exch_rate,                                                          -- Inv_ExchRate
+  debit,                                                                      -- Invoices.Debit
+  unit_name,                                                                  -- Invoices.Unit#
+  unit_description,                                                           -- Invoices.Unit
+  english_unit_description,                                                   -- Invoices.EUnitDes
+  t_quant,                                                                    -- Invoices.TQuant
+  ztsv_cost_quant,                                                            -- Invoiceitems.ZTSV_COSTQUANT => For new feature
+  ztsv_stdfun_cost,                                                           -- Invoiceitems.ZTSV_STDFUNCCOST => For new fature
+  conversion_rate,                                                            -- Part.Conv => For new feature
+  tot_percent,                                                                -- Invoices.TotPercent 
+  details,                                                                    -- Invoices.Details 
+  unit_price_nis,                                                             -- Invoices.UnitPriceNIS
+  unit_price_usd,                                                             -- Invoices.UnitPriceUSD
+  unit_price_gbp,                                                             -- Invoices.UnitPriceGBP
+  unit_price_euro,                                                            -- Invoices.UnitPriceEUR
+  line_total_nis,                                                             -- Invoices.LineTotalNIS
+  line_total_usd,                                                             -- Invoices.LineTotalUSD
+  line_total_gbp,                                                             -- Invoices.LineTotalGBP
+  line_total_euro,                                                            -- Invoices.LineTotalEUR
+  h_cur_code,                                                                 -- Invoices.Head_CurrCode
+  currency_name,                                                              -- Invoices.Head_CurrName
+  inv_curr_line_qprice,                                                       -- Invoices.InvCurr_LineQPrice                                                         
+  line_cost_nis,                                                              -- Invoices.LineCostNIS
+  line_cost_usd,                                                              -- Invoices.LineCostUSD
+  line_cost_gbp,                                                              -- Invoices.LineCostGBP
+  line_cost_euro,                                                             -- Invoices.LineCostEUR
+  line_std_cost_nis,                                                          -- Invoices.LineStdCostNIS
+  line_std_cost_usd,                                                          -- Invoices.LineStdCostUSD
+  line_std_cost_gbp,                                                          -- Invoices.LineStdCostGBP
+  line_std_cost_euro,                                                         -- Invoices.LineStdCostEUR
+  p_line_std_cost_nis,                                                        -- Invoices.LineStdCostNIS
+  p_line_std_cost_usd,                                                        -- Invoices.LineStdCostUSD
+  p_line_std_cost_gbp,                                                        -- Invoices.LineStdCostGBP
+  p_line_std_cost_euro,                                                       -- Invoices.LineStdCostEUR
+  line_total_nis - line_std_cost_nis AS profit_nis,
+  line_total_usd - line_std_cost_usd AS profit_usd,
+  line_total_gbp - line_std_cost_gbp AS profit_gbp,
+  line_total_euro - line_std_cost_euro AS profit_euro,
+  line_total_nis - p_line_std_cost_nis AS p_profit_nis,
+  line_total_usd - p_line_std_cost_usd AS p_profit_usd,
+  line_total_gbp - p_line_std_cost_gbp AS p_profit_gbp,
+  line_total_euro - p_line_std_cost_euro AS p_profit_euro,
+  unit_cost_nis,                                                              -- Invoices.UnitCostNIS
+  unit_cost_usd,                                                              -- Invoices.UnitCostUSD
+  unit_cost_gbp,                                                              -- Invoices.UnitCostGBP
+  unit_cost_euro,                                                             -- Invoices.UnitCostEUR
+  unit_std_cost_nis,                                                          -- Invoices.UnitStdCostNIS
+  unit_std_cost_usd,                                                          -- Invoices.UnitStdCostUSD
+  unit_std_cost_gbp,                                                          -- Invoices.UnitStdCostGBP
+  unit_std_cost_euro,                                                         -- Invoices.UnitStdCostEUR
+  invoice_i_exch_rate,                                                        -- Inv_IExchRate
+  currency_id,                                                                -- Invoices.Currency
+  i_currency,                                                                 -- Invoices.ICurrency
+  status_descripsion,                                                         -- Invoices.Status
+  status_id,                                                                  -- Invoices.IvStat
+  is_canceled,                                                                -- Invoices.Canceled?
+  invoice_type,                                                               -- Iv_Type
+  cur_code,                                                                   -- Inv_Curr
+  dc_date,                                                                    -- Invoices.DCDate
+  dc_line_total_nis,                                                          -- Invoices.DCLineTotalNIS
+  dc_line_total_usd,                                                          -- Invoices.DCLineTotalUSD
+  dc_line_total_gbp,                                                          -- Invoices.DCLineTotalGBP
+  dc_line_total_euro,                                                         -- Invoices.DCLineTotalEUR
+  dc_line_raw_material_nis,                                                   -- Invoices.DCLineRawMaterialNIS
+  dc_line_raw_material_usd,                                                   -- Invoices.DCLineRawMaterialUSD
+  dc_line_raw_material_gbp,                                                   -- Invoices.DCLineRawMaterialGBP
+  dc_line_raw_material_euro,                                                  -- Invoices.DCLineRawMaterialEUR
+  dc_line_work_center_nis,                                                    -- Invoices.DCLineWorkCenterlNIS
+  dc_line_work_center_usd,                                                    -- Invoices.DCLineWorkCenterlUSD
+  dc_line_work_center_gbp,                                                    -- Invoices.DCLineWorkCenterlGBP
+  dc_line_work_center_euro,                                                   -- Invoices.DCLineWorkCenterlEUR
+  dc_line_employees_nis,                                                      -- Invoices.DCLineEmployeeslNIS
+  dc_line_employees_usd,                                                      -- Invoices.DCLineEmployeeslUSD
+  dc_line_employees_gbp,                                                      -- Invoices.DCLineEmployeeslGBP
+  dc_line_employees_euro,                                                     -- Invoices.DCLineEmployeeslEUR
+  dc_line_sup_nis,                                                            -- Invoices.DCLineSuplNIS
+  dc_line_sup_usd,                                                            -- Invoices.DCLineSuplUSD
+  dc_line_sup_gbp,                                                            -- Invoices.DCLineSuplGBP
+  dc_line_sup_euro,                                                           -- Invoices.DCLineSuplEUR
+  -- line_export_price_nis,                                                      -- Invoices.LineExportPriceNIS
+  -- line_export_price_usd,                                                      -- Invoices.LineExportPriceUSD
+  -- line_export_price_gbp,                                                      -- Invoices.LineExportPriceGBP
+  -- line_export_price_euro,                                                     -- Invoices.LineExportPriceEUR
+  ztsv_cont_cost,                                                             -- Invoices.ContainerCostCompanyMainCurr
+  ztsv_cont_cost_nis,                                                         -- Invoices.ContainerCostNIS
+  ztsv_cont_cost_usd,                                                         -- Invoices.ContainerCostUSD
+  ztsv_cont_cost_gbp,                                                         -- Invoices.ContainerCostGBP
+  ztsv_cont_cost_euro,                                                        -- Invoices.ContainerCostEUR
+  ztsv_volin_cont_cbm,                                                        -- Invoices.PartVolumeInContainerM3
+  account_name,                                                               -- Invoices.AccountName
+  account_descripsion,                                                        -- Invoices.AccountDes
+  ztsv_ic_code,                                                               -- Invoices.AccountIntercompanyFlag
+  part_non_standard,                                                          -- Invoices.PartNonStandard
+  CASE 
+    WHEN qv_sales_filter = 1 THEN 1
+    ELSE 0
+  END AS qv_sales_filter,                                                     -- Invoices.FamilyFilterFlag  
+  CASE
+    WHEN db_id = 'palziv' AND account_name LIKE '9%' THEN 'Packing'
+    WHEN db_id = 'palziv' AND account_name LIKE '1%' THEN 'Israel'
+    WHEN db_id = 'palziv' THEN 'palziv'
+    WHEN db_id = 'puk' THEN 'PUK'
+    WHEN db_id = 'tropal' THEN 'Tropal'
+    WHEN db_id = 'pna' THEN 'PNA'
+    WHEN db_id = 'pxl' THEN 'PXL'
+    WHEN db_id = 'palmex' THEN 'PMEX'
+    WHEN db_id = 'fomsrl' THEN 'SRL'
+    WHEN db_id = 'foamot' THEN 'Foamotive'
+    WHEN db_id = 'fommex' THEN 'FMEX'
+  END AS account_company,                                                     -- Invoices.AccountCompany
+  CASE
+    WHEN db_id = 'palziv' AND account_name LIKE '9%' THEN 'Packing'
+    WHEN db_id IN ('palziv', 'puk', 'tropal') THEN 'Israel'
+    WHEN db_id IN ('pna', 'pxl', 'palmex') THEN 'PNA'
+    WHEN db_id IN ('fomsrl', 'foamot', 'fommex') THEN 'FMTV'
+    ELSE NULL
+  END AS account_group_company,                                               -- Invoices.AccountGroupCompany
+  reference,                                                                  -- Invoices.Orders_CustPO
+  zpal_pack_flag,                                                             -- Invoices.PalzivPackingTradeFlag
+  -- InvoicesToAggregatedIvLinesKey
+  -- SalesKeyTableToInvoicesKey
+FROM invoice_temp_4
+)

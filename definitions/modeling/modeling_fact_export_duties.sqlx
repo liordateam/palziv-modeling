@@ -1,0 +1,33 @@
+config {
+  type: "view", 
+}
+
+CREATE VIEW `palziv-data-prod.modeling.modeling_fact_export_duties` AS (
+WITH impfiledutiel AS (
+  SELECT DISTINCT
+    import_file_db_id,
+    part_id,
+    quantity,
+    part_db_id, 
+    SUM(e_price) AS total_export_price
+  FROM `palziv-data-prod.dwh.dwh_impfiledutiel` 
+  WHERE part_id <> 0
+  GROUP BY import_file_db_id, part_db_id, part_id, quantity
+)
+SELECT 
+  impfiles.db_id,
+  impfiles.import_file_id,
+  impfiles.import_file_number,
+  impfiledutiel.part_id,
+  impfiledutiel.quantity,
+  impfiledutiel.total_export_price,
+  impfiledutiel.part_db_id,
+  CASE
+    WHEN impfiledutiel.quantity <> 0 THEN impfiledutiel.total_export_price / impfiledutiel.quantity
+    ELSE 0
+  END AS export_price_per_unit
+FROM
+  `palziv-data-prod.dwh.dwh_impfiles` AS impfiles
+JOIN
+  impfiledutiel ON impfiles.import_file_db_id = impfiledutiel.import_file_db_id 
+)

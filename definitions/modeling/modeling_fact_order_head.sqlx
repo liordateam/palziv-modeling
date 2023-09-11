@@ -1,0 +1,47 @@
+config {
+  type: "view",
+}
+
+CREATE VIEW `palziv-data-prod.modeling.modeling_fact_order_head` AS (
+SELECT DISTINCT
+    orders.db_id,                                             -- OrdersHead.DB
+    orders.order_db_id,                                       -- OrdersHeadToOrderItemsKey
+    orders.order_name_db_id,
+    orders.customer_db_id,
+    orders.customer_id,                                       -- OrdersHead.Cust
+    orders.agent_id,                                          -- OrdersHead.Agent
+    orders.order_name,                                        -- OrdersHead.Order#
+    orderstatus.order_staus_descripsion,                               -- OrdersHead.OrdStatusDes
+    orderstatus.zpal_approved,                                         -- OrdersHead.ConfirmedFlag
+    orders.created_at,                                        -- OrdersHead.CurDate
+    orders.q_price,                                           -- OrdersHead.QPrice
+    orders.t_percent,                                         -- OrdersHead.TPercent1
+    orders.dis_price,                                         -- OrdersHead.DisPrice
+    orders.tot_price,                                         -- OrdersHead.TotPrice
+    orders.updated_at,                                        -- OrdersHead.UDate
+    orders.is_closed,                                         -- OrdersHead.Closed
+    orders.is_partial_close,                                  -- OrdersHead.PClosed
+    currencies.exchange_rate,                                 -- OrdersHead.Exchange
+    currencies.code,                                          -- OrdersHead.CurrCode
+    currencies.currency_name,                                 -- OrdersHead.CurrName
+    curregitems.cur_date,                                     -- OrdersHead.CurregCurDate
+    curregitems.exchange,                                     -- OrdersHead.CurregExchange
+    curregitems.exchange * currencies.exchange_quantity AS head_exchange_rate,  -- OrdersHead.ExchRate
+    cproftypes.order_type_code,                                       -- OrdersHead.OrdTypeCode
+    cproftypes.order_type_descripsion,                                -- OrdersHead.OrdTypeDes
+  FROM 
+    `palziv-data-prod.dwh.dwh_orders` as orders
+  LEFT JOIN
+    `palziv-data-prod.dwh.dwh_currencies` AS currencies ON orders.currency_db_id = currencies.currency_db_id
+  LEFT JOIN 
+    `palziv-data-prod.dwh.dwh_curregitems` AS curregitems ON orders.currency_history_db_id = curregitems.currency_history_db_id
+  LEFT JOIN 
+    `palziv-data-prod.dwh.dwh_orderstatus` AS orderstatus ON orders.order_status_db_id = orderstatus.order_status_db_id
+  LEFT JOIN 
+    `palziv-data-prod.dwh.dwh_cproftypes` AS cproftypes ON orders.order_type_db_id  = cproftypes.order_type_db_id  
+  WHERE 
+    orders.order_id <> 0 AND 
+    orders.order_status <> -6 AND 
+    orders.db_id IN ('palziv', 'pna', 'foamot', 'puk', 'fomsrl', 'tropal','fommex','palmex') AND
+    DATE(orders.created_at) > DATE(EXTRACT(year FROM CURRENT_DATE())- 5,1,1)
+)

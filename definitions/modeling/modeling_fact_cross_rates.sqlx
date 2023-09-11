@@ -1,0 +1,81 @@
+config {
+  type: "view", 
+}
+
+CREATE VIEW `palziv-data-prod.modeling.modeling_fact_cross_rates` AS (
+WITH 
+curregitems AS (
+  SELECT *
+  FROM `palziv-data-prod.dwh.dwh_curregitems`
+  WHERE 
+    DATE(cur_date) > DATE(EXTRACT(year FROM CURRENT_DATE())- 5,1,1)
+    AND CONCAT(db_id, '_', currency_id) IN ('palziv_-2', 'palziv_13','palziv_29', 'palziv_30', 'palziv_88','palziv_70')
+),
+curreg9 AS (
+  SELECT 
+    CONCAT(curregitems.db_id, '_', curregitems.currency_id) AS currency_db_id,        -- Curreg.Currency
+    curregitems.exchange,                                           -- Curreg.Exchange
+    curregitems.currency_history_db_id AS currency_key,             -- CurrencyKey
+    curregitems.db_id,                                              -- Curreg.DB
+    cur_date,                                                       -- Curreg.ExchDateKey
+    d.date,                                                         -- Curreg.ExchDate
+  FROM 
+    curregitems
+  FULL JOIN 
+    `palziv-data-prod.modeling.modeling_dim_date` AS d ON DATE(curregitems.cur_date) = d.date_key
+), temp_exch_rate AS (
+  SELECT
+    curreg9.currency_key,
+    curreg9.currency_db_id,   -- ExchRate.Currency
+    curreg9.exchange,         -- ExchRate.Exchange
+    curreg9.date              -- ExchRate.ExchDate
+  FROM 
+    `palziv-data-prod.modeling.modeling_dim_current_currency` AS curr9
+  FULL JOIN 
+    curreg9 ON curr9.currency_key = curreg9.currency_key 
+), cross_rates AS (
+  SELECT 
+    date,
+    MAX(`palziv_-2`) AS usd,
+    MAX(`palziv_13`) AS cad,
+    MAX(`palziv_29`) AS euro,
+    MAX(`palziv_30`) AS gbp,
+    MAX(`palziv_88`) AS ron,
+    MAX(`palziv_70`) AS mxn
+  FROM
+    temp_exch_rate
+    PIVOT(SUM(exchange) FOR currency_db_id IN ('palziv_29', 'palziv_88', 'palziv_-2', 'palziv_30', 'palziv_70', 'palziv_13')) 
+    GROUP BY date
+)
+
+SELECT
+  date,
+  CASE
+    WHEN cr.usd IS NOT NULL THEN cr.usd
+    ELSE er.usd
+  END AS usd,
+  CASE
+    WHEN cr.cad IS NOT NULL THEN cr.cad
+    ELSE er.cad
+  END AS cad,
+  CASE
+    WHEN cr.euro IS NOT NULL THEN cr.euro
+    ELSE er.euro
+  END AS euro,
+  CASE
+    WHEN cr.gbp IS NOT NULL THEN cr.gbp
+    ELSE er.gbp
+  END AS gbp,
+  CASE
+    WHEN cr.ron IS NOT NULL THEN cr.ron
+    ELSE er.ron
+  END AS ron,
+  CASE
+    WHEN cr.mxn IS NOT NULL THEN cr.mxn
+    ELSE er.mxn
+  END AS mxn
+FROM 
+  cross_rates AS cr 
+JOIN 
+  `palziv-data-prod.modeling.modeling_dim_exchange_rate` AS er ON true
+)

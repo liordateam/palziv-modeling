@@ -1,0 +1,78 @@
+config {
+  type: "view", 
+}
+
+CREATE VIEW `palziv-data-prod.modeling.modeling_fact_invoice_lines` AS (
+WITH 
+  parts AS (
+    SELECT DISTINCT
+      cost,
+      std_cost,
+      conversion_rate,
+      part_final_conv,
+      qv_sales_filter,
+      part_db_id
+    FROM `palziv-data-prod.modeling.modeling_dim_parts`
+  )
+SELECT 
+  invoiceitems.part_db_id,                    -- InvoiceItems.PartKey / InvoiceItemsToPartKey / InvoiceItemsToPartDesKey
+  invoiceitems.invoice_db_id,                 -- InvoicesHeadToInvoiceItemsKey
+  invoiceitems.db_id,                         -- Invoices.DB
+  invoiceitems.part_id,                       -- Invoices.Part
+  invoiceitems.quant,                         -- Invoices.Quant
+  invoiceitems.currency_id,                   -- Invoices.Currency
+  invoiceitems.i_currency,                    -- Invoices.ICurrency
+  invoiceitems.i_exchange,                    -- Invoices.IExchange	
+  invoiceitems.iv_cost,                       -- Invoices.IvCost	
+  invoiceitems.line,                          -- Invoices.Line	
+  invoiceitems.price,                         -- Invoices.UnitPrice	
+  invoiceitems.prsource,                      -- Invoices.PRSource
+  invoiceitems.q_price,                       -- Invoices.QPrice2
+  invoiceitems.t_percent,                     -- Invoices.ItemsTPercent
+  invoiceitems.user_id,                       -- Invoices.TUser2 	
+  invoiceitems.tot_percent,                   -- Invoices.TotPercent 
+  invoiceitems.updated_at,                    -- Invoices.ItemsUDate
+  invoiceitems.type,                          -- Invoices.Type
+  invoiceitems.zpal_pack_flag,                -- Invoices.PalzivPackingTradeFlag
+  invoiceitems.ztsv_volin_cont_cbm,           -- Invoices.PartVolumeInContainerM3
+  invoiceitems.ztsv_cont_cost,                -- Invoices.ContainerCostCompanyMainCurr
+  invoiceitems.t_quant,                       -- Invoices.TQuant
+  invoiceitems.ztsv_cost_quant,               -- Invoiceitems.ZTSV_COSTQUANT => For new feature
+  invoiceitems.ztsv_srdfun_cost AS ztsv_stdfun_cost,  -- Invoiceitems.ZTSV_STDFUNCCOST => For new fature
+  parts.conversion_rate,                      -- Part.Conv => For new feature
+  parts.cost,                                 -- Invoices.UnitCost
+  parts.std_cost,                             -- Invoices.UnitStdCost
+  parts.part_final_conv,                      -- Invoices.UnitFinalConv
+  parts.qv_sales_filter,                      -- Invoices.FamilyFilterFlag  
+  nonstandard.text AS part_non_standard,      -- Invoices.PartNonStandard
+  currencies.code,                            -- Invoices.CurrCode
+  currencies.currency_name,                   -- Invoices.CurrName
+  unit.unit_name,                             -- Invoices.Unit#
+  unit.unit_description,                      -- Invoices.Unit
+  unit.english_unit_description,              -- Invoices.EUnitDes
+  accounts.account_name,                      -- Invoices.AccountName
+  accounts.account_descripsion,               -- Invoices.AccountDes
+  accounts.ztsv_ic_code,                      -- Invoices.AccountIntercompanyFlag
+  orders.reference,                           -- Invoices.Orders_CustPO
+FROM 
+  `palziv-data-prod.dwh.dwh_invoiceitems` AS invoiceitems
+LEFT JOIN 
+  parts ON invoiceitems.part_db_id = parts.part_db_id
+LEFT JOIN
+  `palziv-data-prod.dwh.dwh_nonstandard` AS nonstandard ON invoiceitems.non_standard_db_id = nonstandard.non_standard_db_id
+LEFT JOIN 
+  `palziv-data-prod.dwh.dwh_currencies` AS currencies ON invoiceitems.currency_db_id = currencies.currency_db_id AND currencies.currency_id <> 0
+LEFT JOIN
+  `palziv-data-prod.dwh.dwh_unit` AS unit ON invoiceitems.unit_db_id = unit.unit_db_id AND unit.unit_id <> 0
+LEFT JOIN 
+  `palziv-data-prod.dwh.dwh_accounts` AS accounts ON invoiceitems.account_db_id = accounts.account_db_id AND accounts.account_id <> 0
+LEFT JOIN
+  `palziv-data-prod.dwh.dwh_ordersitems` AS ordersitems ON invoiceitems.order_line_db_id = ordersitems.order_line_db_id AND ordersitems.order_id <> 0
+LEFT JOIN 
+  `palziv-data-prod.dwh.dwh_orders` AS orders ON ordersitems.order_db_id = orders.order_db_id AND orders.order_id <> 0
+
+WHERE Date(invoiceitems.updated_at) >= DATE(EXTRACT(year FROM CURRENT_DATE())- 5,1,1)
+  AND invoiceitems.invoice_id <> 0
+  AND invoiceitems.part_id <> 0
+  AND invoiceitems.db_id IN ('palziv', 'pna', 'foamot', 'puk', 'fomsrl', 'tropal', 'fommex', 'palmex')
+)

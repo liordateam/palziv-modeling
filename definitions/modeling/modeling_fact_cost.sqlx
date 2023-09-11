@@ -1,0 +1,39 @@
+config {
+  type: "view",
+}
+
+CREATE VIEW `palziv-data-prod.modeling.modeling_fact_cost` AS (
+SELECT 
+  pc.part_db_id,                                              -- Cost.PartKey
+  CONCAT(pc.part_db_id, '_', pc.cur_date) AS part_date_db_id, -- Cost.DBPartYearMonth_FullKey
+  pc.cur_date,                                                -- Cost.Curdate
+  p.type,                                                     -- CostPartCost.Type 
+  CASE
+    WHEN p.type = 'R' THEN pc.standard_1
+    ELSE dc.tot_1
+  END AS total,                                               -- Cost.Total
+  CASE 
+    WHEN p.type = 'R' THEN pc.standard_1
+    ELSE dc.raw_1
+  END AS raw_material,                                        -- Cost.RawMaterial
+  dc.wkc_1,                                                   -- Cost.WorkCenter
+  dc.emp_1,                                                   -- Cost.Employees
+  dc.sup_1,                                                   -- Cost.Sup	
+FROM 
+  `palziv-data-prod.dwh.dwh_partcost` AS pc
+LEFT JOIN
+  `palziv-data-prod.dwh.dwh_part` AS p ON pc.part_db_id = p.part_db_id 
+  AND p.part_id <> 0 
+  AND p.type <> 'T'
+LEFT JOIN 
+  `palziv-data-prod.dwh.dwh_detailedcost` AS dc ON CONCAT(pc.part_db_id, '_', pc.cur_date) = CONCAT(dc.part_db_id, '_', dc.cur_date) 
+  AND dc.serial_id = -2
+  AND dc.t_full = 'Y'
+  AND dc.flag = 'C'
+  AND dc.tot_1 > 0  
+WHERE
+  pc.part_id <> 0
+  AND pc.cur_date > DATE(EXTRACT(year FROM CURRENT_DATE())- 6,12,1)
+  AND pc.db_id IN ('palziv', 'pna', 'foamot', 'puk', 'fomsrl', 'tropal','fommex','palmex')
+  AND (pc.standard_1 > 0 OR pc.standard_2 > 0) 
+)

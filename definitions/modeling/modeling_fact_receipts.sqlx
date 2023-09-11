@@ -1,0 +1,104 @@
+config {
+  type: "view",
+}
+
+CREATE VIEW `palziv-data-prod.modeling.modeling_fact_receipts` AS (
+WITH reciepts AS (
+  SELECT 
+    invoices.db_id,                                                       -- Receipts.DB
+    invoices.invoice_number,                                              -- Receipts.ReceiptNum   
+    invoices.invoice_date,                                                -- Receipts.Date    
+    invoices.agent_id,                                                    -- Receipts.Agent
+    invoices.customer_id,                                                 -- Receipts.Cust  
+    invoices.currency_id,                                                 -- Receipts.Currency  
+    invoices.tot_price,                                                   -- Receipts.TotPrice
+    invoices.pay_date,                                                    -- Receipts.PayDate / ReceiptsToCrossRatesKey
+    fnctarns.exchange_3,                                                  -- Receipts.Exchange3
+    fnctarns.currency3,                                                   -- Receipts.FncCurrency3
+    currencies.exchange_rate AS exchange,                                 -- Receipts.Exchange
+    currencies.currency_name,                                             -- Receipts.Head_CurrName
+    curregitems.exchange AS curreg_exchange_rate,                         -- Receipts.CurregExchange
+    CASE 
+      WHEN invoices.currency_id = -1 THEN 1
+      WHEN invoices.currency_id = fnctarns.currency3 THEN fnctarns.exchange_3
+      WHEN curregitems.exchange > 0 THEN curregitems.exchange
+      ELSE currencies.exchange_rate
+    END AS exchange_rate,                                                 -- Receipts.ExchRate
+    cross_rates.usd,                                                      -- Receipts.USD
+    cross_rates.gbp,                                                      -- Receipts.GBP
+    cross_rates.euro,                                                     -- Receipts.EUR
+    cross_rates.ron,                                                      -- Receipts.RON
+    cross_rates.mxn                                                       -- Receipts.MXN
+  FROM
+    `palziv-data-prod.dwh.dwh_invoices` AS invoices
+  LEFT JOIN
+    `palziv-data-prod.dwh.dwh_fnctrans` AS fnctarns ON invoices.fnc_trans_db_id = fnctarns.fnc_trans_db_id
+      AND fnctarns.fnc_trans_id <> 0
+  LEFT JOIN
+    `palziv-data-prod.dwh.dwh_currencies` AS currencies ON invoices.currency_db_id = currencies.currency_db_id
+      AND currencies.currency_id <> 0
+  LEFT JOIN 
+    `palziv-data-prod.dwh.dwh_curregitems` AS curregitems ON CONCAT(invoices.db_id, '_', invoices.currency_id, '_', invoices.pay_date) = curregitems.currency_history_db_id
+      AND curregitems.currency_id <> 0
+  LEFT JOIN
+    `palziv-data-prod.modeling.modeling_fact_cross_rates` AS cross_rates ON invoices.pay_date = cross_rates.date
+  WHERE invoices.pay_date >= DATE(EXTRACT(year FROM CURRENT_DATE())- 5,1,1)
+    AND invoices.invoice_id <> 0
+    AND invoices.final = 'Y' 
+    AND invoices.type = 'T'
+    AND invoices.customer_id <> 0
+    AND invoices.db_id IN ('palziv', 'pna', 'foamot', 'puk', 'fomsrl', 'tropal','fommex','palmex') 
+)
+SELECT 
+  -- SalesKeyTableToReceiptsKey
+  CONCAT(db_id, '_', invoice_number) AS invoice_number_db_id,
+  CONCAT(db_id, '_', customer_id) AS customer_db_id,
+  CONCAT(db_id, '_', agent_id) AS agent_db_id,
+  db_id,                                                        -- Receipts.DB
+  invoice_number,                                               -- Receipt# 
+  invoice_date,                                                 -- Receipts.Date    
+  agent_id,                                                     -- Receipts.Agent
+  customer_id,                                                  -- Receipts.Cust  
+  currency_id,                                                  -- Receipts.Currency  
+  tot_price,                                                    -- Receipts.TotPrice
+  pay_date,                                                     -- Receipts.PayDate
+  currency3,                                                    -- Receipts.FncCurrency3
+  exchange_3,                                                   -- Receipts.Exchange3
+  curreg_exchange_rate,                                         -- Receipts.CurregExchange
+  exchange,                                                     -- Receipts.Exchange
+  exchange_rate,                                                -- Receipts.ExchRate
+  0 AS qv_sales_filter,
+  CASE 
+    WHEN CONCAT(db_id, '_', currency_id) IN ('pna_-2', 'puk_-2', 'fomsrl_42', 'tropal_42', 'fommex_42', 'palmex_42') THEN tot_price
+    WHEN db_id IN ('palziv', 'foamot') THEN tot_price * exchange_rate
+    WHEN db_id = 'pna' THEN tot_price * exchange_rate * usd
+    WHEN db_id = 'puk' THEN tot_price * exchange_rate * gbp
+    WHEN db_id IN ('fomsrl', 'tropal') THEN tot_price * exchange_rate * ron
+    ELSE tot_price * exchange_rate * mxn
+  END AS total_price_nis,                                       -- Receipts.TotPriceNIS
+  CASE 
+    WHEN CONCAT(db_id, '_', currency_id) IN ('palziv_-2', 'foamot_-2', 'puk_109', 'fomsrl_109', 'tropal_109', 'fommex_-2', 'palmex_-2') THEN tot_price
+    WHEN db_id IN ('palziv', 'foamot') THEN tot_price * exchange_rate / usd
+    WHEN db_id = 'pna' THEN tot_price * exchange_rate
+    WHEN db_id = 'puk' THEN tot_price * exchange_rate * gbp / usd 
+    WHEN db_id IN ('fomsrl', 'tropal') THEN tot_price * exchange_rate * ron / usd
+    ELSE tot_price * exchange_rate * mxn / usd
+  END AS total_price_usd,                                       -- Receipts.TotPriceUSD
+  CASE 
+    WHEN CONCAT(db_id, '_', currency_id) IN ('palziv_30', 'foamot_30', 'pna_30', 'fomsrl_30', 'tropal_30', 'fommex_30', 'palmex_30') THEN tot_price
+    WHEN db_id IN ('palziv', 'foamot') THEN tot_price * exchange_rate / gbp
+    WHEN db_id = 'pna' THEN tot_price * exchange_rate * usd / gbp
+    WHEN db_id = 'puk' THEN tot_price * exchange_rate 
+    WHEN db_id IN ('fomsrl', 'tropal') THEN tot_price * exchange_rate * ron / gbp
+    ELSE tot_price * exchange_rate * mxn / gbp
+  END AS total_price_gbp,                                       -- Receipts.TotPriceGBP
+  CASE 
+    WHEN CONCAT(db_id, '_', currency_id) IN ('palziv_29', 'foamot_29', 'pna_29', 'puk_29', 'fomsrl_-2', 'tropal_-2', 'fommex_109', 'palmex_109') THEN tot_price
+    WHEN db_id IN ('palziv', 'foamot') THEN tot_price * exchange_rate / euro
+    WHEN db_id = 'pna' THEN tot_price * exchange_rate * usd / euro
+    WHEN db_id = 'puk' THEN tot_price * exchange_rate * gbp / euro
+    WHEN db_id IN ('fomsrl', 'tropal') THEN tot_price * exchange_rate * ron / euro
+    ELSE tot_price * exchange_rate * mxn / euro
+  END AS total_price_euro,                                       -- Receipts.TotPriceEUR
+FROM reciepts
+)

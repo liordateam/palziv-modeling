@@ -1,0 +1,48 @@
+config {
+  type: "view", 
+}
+
+CREATE VIEW `palziv-data-prod.modeling.modeling_dim_date` AS (
+SELECT
+  d AS date,
+  d AS date_key,
+  EXTRACT(YEAR
+  FROM
+    d) AS year,
+  EXTRACT(WEEK
+  FROM
+    d) AS year_week,
+  EXTRACT(DAY
+  FROM
+    d) AS year_day,
+  EXTRACT(YEAR
+  FROM
+    d) AS fiscal_year,
+  FORMAT_DATE('%Q', d) AS fiscal_qtr,
+  EXTRACT(MONTH
+  FROM
+    d) AS month,
+  FORMAT_DATE('%B', d) AS month_name,
+  FORMAT_DATE('%w', d) AS week_day,
+  FORMAT_DATE('%A', d) AS day_name,
+  CONCAT(EXTRACT(YEAR
+    FROM
+      d),' ',FORMAT_DATE('%B', d)) AS year_month,
+  concat(extract(MONTH from d),'-', extract(YEAR from d)) AS year_month_number,
+  concat(extract(QUARTER from d),'-', extract(YEAR from d)) AS year_quarter_number,
+  (CASE
+      WHEN FORMAT_DATE('%A', d) IN ('Sunday', 'Saturday') THEN 0
+    ELSE
+    1
+  END
+  
+    ) AS day_is_weekday,
+  date(current_date()) as today
+FROM (
+  SELECT
+    *
+  FROM
+    UNNEST(GENERATE_DATE_ARRAY('2014-01-01',DATE(CURRENT_DATE() + 30), INTERVAL 1 DAY)) AS d )
+ORDER BY
+  1 desc
+)

@@ -1,0 +1,117 @@
+config {
+  type: "view", 
+}
+
+CREATE VIEW `palziv-data-prod.modeling.modeling_fact_order_lines` AS (
+WITH 
+  order_lines AS (
+    SELECT DISTINCT
+      unit_db_id,
+      currency_db_id,
+      part_db_id,
+      non_standard_db_id,
+      order_id,
+      order_db_id,
+      db_id,
+      order_line_id,
+      currency,
+      part_id,
+      abalance,
+      adjusted_price,
+      buget_id,
+      is_closed,
+      cluster_id,
+      agent_commission,
+      costc
+      cust_part,
+      deali,
+      dest_code,
+      due_date,
+      i_currency,
+      i_exchange,
+      k_line,
+      line,
+      MODEL,
+      p_balance,
+      p_date,
+      pr_date,
+      price,
+      price_bal,
+      p_rsource,
+      purchase_price,
+      purtaxpercent,
+      q_price,
+      q_profit,
+      quant,
+      rev,
+      t_percent,
+      tuser,
+      t_balance,
+      t_quantity,
+      unit_id,
+      updated_at,
+      vat_flag,
+    FROM
+      `palziv-data-prod.dwh.dwh_ordersitems`
+    WHERE 
+      order_id <> 0 AND
+      db_id IN ('palziv', 'pna', 'foamot', 'puk', 'fomsrl', 'tropal','fommex','palmex')
+  ), units AS (
+    SELECT DISTINCT
+      unit_db_id,
+      unit_name,                          
+      unit_description,                   
+      english_unit_description,  
+    FROM 
+      `palziv-data-prod.dwh.dwh_unit`    
+    WHERE unit_id <> 0     
+  ),parts AS (
+    SELECT DISTINCT
+      part_db_id,
+      qv_sales_filter,
+    FROM 
+      `palziv-data-prod.modeling.modeling_dim_parts`
+  )
+SELECT DISTINCT
+  order_lines.db_id,                              -- OrderItems.DB
+  order_lines.part_db_id,                         -- OrderItemsToPartKey
+  order_lines.order_db_id,                        -- OrdersHeadToOrderItemsKey
+  order_lines.part_id,                            -- OrderItems.Part
+  order_lines.due_date,                           -- OrderItems.DueDate
+  order_lines.abalance,                           -- OrderItems.ABalance
+  order_lines.adjusted_price,                     -- OrderItems.AdjPrice
+  order_lines.is_closed,                          -- OrderItems.Closed
+  order_lines.currency,                           -- OrderItems.Currency
+  order_lines.i_currency,                         -- OrderItems.ICurrency
+  order_lines.i_exchange,                         -- OrderItems.IExchange
+  currencies.exchange_quantity,                   -- OrderItems.IExchQuant
+  currencies.code,                                -- OrderItems.ICurrCode
+  order_lines.i_exchange * currencies.exchange_quantity AS i_exchange_rate,    -- OrderItems.IExch_Rate
+  order_lines.line,                               -- OrderItems.Line
+  order_lines.price,                              -- OrderItems.Price
+  order_lines.price_bal,                          -- OrderItems.PriceBal
+  order_lines.purchase_price,                     -- OrderItems.PurchasePrice
+  order_lines.q_price,                            -- OrderItems.QPrice
+  order_lines.q_profit,                           -- OrderItems.QProfit
+  order_lines.quant         ,                     -- OrderItems.Quant
+  order_lines.t_percent,                          -- OrderItems.TPercent2
+  order_lines.t_balance AS t_balance,             -- OrderItems.TBalance
+  order_lines.t_quantity AS t_quantity,           -- OrderItems.TQuant
+  order_lines.updated_at,                         -- OrderItems.UDate
+  u.unit_name,                                    -- OrderItems.TUnitName
+  u.unit_description,                             -- OrderItems.TUnitDes
+  u.english_unit_description,                     -- OrderItems.EUnitDes
+  parts.qv_sales_filter,                          -- OrderItems.FamilyFilterFlag
+  nonstandard.text AS part_non_standard,          -- OrderItems.PartNonStandard
+  order_id
+FROM
+  order_lines
+LEFT JOIN 
+  units AS u ON order_lines.unit_db_id = u.unit_db_id 
+LEFT JOIN 
+  `palziv-data-prod.dwh.dwh_currencies` AS currencies ON order_lines.currency_db_id = currencies.currency_db_id AND currencies.currency_id <> 0
+LEFT JOIN
+  parts ON order_lines.part_db_id = parts.part_db_id 
+LEFT JOIN
+  `palziv-data-prod.dwh.dwh_nonstandard` AS nonstandard ON nonstandard.non_standard_db_id = order_lines.non_standard_db_id
+)

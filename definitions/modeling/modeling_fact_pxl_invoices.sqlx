@@ -1,0 +1,145 @@
+config {
+  type: "view", 
+}
+
+CREATE VIEW `palziv-data-prod.modeling.modeling_fact_pxl_invoices` AS (
+WITH pxl_invoices AS (
+  SELECT 
+    'pxl' AS db_id,                                 -- PxlInvoices.DB	
+    DATE(date) AS date,                             -- PxlInvoices.Date / PxlInvoicesToCrossRatesDateKey
+    invoice_number,                                 -- PxlInvoices.IvNum
+    customer_descripsion,                           -- PxlInvoices.CustomerDes
+    org_curr_code,                                  -- PxlInvoices.OrgCurrCode
+    curr_code,                                      -- PxlInvoices.CurrCode
+    product_family,                                 -- PxlInvoices.ProductFamily
+    CASE
+      WHEN product_family LIKE 'Q%' AND REGEXP_CONTAINS(product_family, r'^.{1}\d') THEN CAST(SUBSTRING(product_family, 2,1) AS INT)
+      WHEN UPPER(product_family) = 'PNA'
+        AND LEFT(part_name, 1) = 'Q' 
+        AND REGEXP_CONTAINS(part_name, r'^.{1}\d') 
+        THEN CAST(SUBSTRING(part_name, 2,1) AS INT)
+      ELSE NULL
+    END AS part_weight,                             -- PxlInvoices.PartWeight
+    CASE 
+      WHEN UPPER(product_family) = 'EFO' THEN 'Consumer Sales'
+      WHEN UPPER(LEFT(product_family, 1)) = 'Q' OR UPPER(product_family) = 'PNA' THEN 'Vizion'
+      ELSE 'Other'  
+    END AS basic_material,                          -- PxlInvoices.BasicMaterial
+    part_name,                                      -- PxlInvoices.PartName
+    part_descripsion,                               -- PxlInvoices.PartDes
+    part_descripsion_cont,                          -- PxlInvoices.PartDesCont
+    -- bdft,                                        -- PxlInvoices.PartVolBoardFoot
+    part_vol_board_foot,                            -- PxlInvoices.PartVolBoardFoot
+    quant,                                          -- PxlInvoices.Quant
+    tot_price,                                      -- PxlInvoices.TotPrice
+    unit_price,                                     -- PxlInvoices.UnitPrice
+    tot_cost,                                       -- PxlInvoices.TotCost
+    unit_cost,                                      -- PxlInvoices.UnitCost
+    currency_key,                                   -- PxlInvoices.CurrencyKey
+  FROM
+    `palziv-data-prod.dwh.dwh_pxl_invoice` 
+  WHERE 
+    DATE(date) > DATE(EXTRACT(year FROM CURRENT_DATE())- 5,1,1)
+)
+SELECT
+  IFNULL(invoices.db_id, 'pxl') AS db_id,           -- PxlInvoices.DB	
+  invoices.date,                                    -- PxlInvoices.Date / PxlInvoicesToCrossRatesDateKey
+  invoices.invoice_number,                          -- PxlInvoices.IvNum
+  ROW_NUMBER() OVER(PARTITION BY CAST(invoices.invoice_number AS STRING)) AS iv_row,
+  IFNULL(invoices.customer_descripsion, pxl_data.customer) AS customer_descripsion,   -- PxlInvoices.CustomerDes
+  invoices.org_curr_code,                           -- PxlInvoices.OrgCurrCode
+  invoices.curr_code,                               -- PxlInvoices.CurrCode
+  invoices.product_family,                          -- PxlInvoices.ProductFamily
+  invoices.part_weight,                             -- PxlInvoices.PartWeight
+  invoices.basic_material,                          -- PxlInvoices.BasicMaterial
+  invoices.part_name,                               -- PxlInvoices.PartName
+  invoices.part_descripsion,                        -- PxlInvoices.PartDes
+  invoices.part_descripsion_cont,                   -- PxlInvoices.PartDesCont
+  invoices.part_vol_board_foot,                     -- PxlInvoices.PartVolBoardFoot
+  invoices.quant,                                   -- PxlInvoices.Quant
+  invoices.tot_price,                               -- PxlInvoices.TotPrice
+  invoices.unit_price,                              -- PxlInvoices.UnitPrice
+  invoices.tot_cost,                                -- PxlInvoices.TotCost
+  invoices.unit_cost,                               -- PxlInvoices.UnitCost
+  cross_rates.usd,                                  -- PxlInvoices.USD
+  cross_rates.euro,                                 -- PxlInvoices.EUR
+  cross_rates.gbp,                                  -- PxlInvoices.GBP
+  cross_rates.cad,                                  -- PxlInvoices.CAD
+  ----- Exchange - Line Total -----
+  CASE
+    WHEN invoices.currency_key = 'palziv-13' THEN invoices.tot_price * cross_rates.cad
+    ELSE invoices.tot_price * cross_rates.usd
+  END AS line_total_nis,                            -- PxlInvoices.LineTotalNIS
+  CASE
+    WHEN invoices.currency_key = 'palziv-13' THEN invoices.tot_price * cross_rates.cad / cross_rates.usd
+    ELSE invoices.tot_price
+  END AS line_total_usd,                            -- PxlInvoices.LineTotalUSD
+  CASE
+    WHEN invoices.currency_key = 'palziv-13' THEN invoices.tot_price * cross_rates.cad / cross_rates.gbp
+    ELSE invoices.tot_price * cross_rates.usd / cross_rates.gbp
+  END AS line_total_gbp,                            -- PxlInvoices.LineTotalGBP
+  CASE
+    WHEN invoices.currency_key = 'palziv-13' THEN invoices.tot_price * cross_rates.cad / cross_rates.euro
+    ELSE invoices.tot_price * cross_rates.usd / cross_rates.euro
+  END AS line_total_euro,                           -- PxlInvoices.LineTotalEUR
+  ----- Exchange - Line Cost -----
+  CASE
+    WHEN invoices.currency_key = 'palziv-13' THEN invoices.tot_cost * cross_rates.cad
+    ELSE invoices.tot_cost * cross_rates.usd
+  END AS line_cost_nis,                             -- PxlInvoices.LineCostNIS
+  CASE
+    WHEN invoices.currency_key = 'palziv-13' THEN invoices.tot_cost * cross_rates.cad / cross_rates.usd
+    ELSE invoices.tot_cost
+  END AS line_cost_usd,                             -- PxlInvoices.LineCostUSD
+  CASE
+    WHEN invoices.currency_key = 'palziv-13' THEN invoices.tot_cost * cross_rates.cad / cross_rates.gbp
+    ELSE invoices.tot_cost * cross_rates.usd / cross_rates.gbp
+  END AS line_cost_gbp,                             -- PxlInvoices.LineCostGBP
+  CASE
+    WHEN invoices.currency_key = 'palziv-13' THEN invoices.tot_cost * cross_rates.cad / cross_rates.euro
+    ELSE invoices.tot_cost * cross_rates.usd / cross_rates.euro
+  END AS line_cost_euro,                            -- PxlInvoices.LineCostEUR
+  ----- Exchange - UNIT Price -----
+  CASE
+    WHEN invoices.currency_key = 'palziv-13' THEN invoices.unit_price * cross_rates.cad
+    ELSE invoices.unit_price * cross_rates.usd
+  END AS unit_price_nis,                            -- PxlInvoices.UnitPriceNIS
+  CASE
+    WHEN invoices.currency_key = 'palziv-13' THEN invoices.unit_price * cross_rates.cad / cross_rates.usd
+    ELSE invoices.unit_price
+  END AS unit_price_usd,                            -- PxlInvoices.UnitPriceUSD 
+  CASE
+    WHEN invoices.currency_key = 'palziv-13' THEN invoices.unit_price * cross_rates.cad / cross_rates.gbp
+    ELSE invoices.unit_price * cross_rates.usd / cross_rates.gbp
+  END AS unit_price_gbp,                            -- PxlInvoices.UnitPriceGBP
+  CASE
+    WHEN invoices.currency_key = 'palziv-13' THEN invoices.unit_price * cross_rates.cad / cross_rates.euro
+    ELSE invoices.unit_price * cross_rates.usd / cross_rates.euro
+  END AS unit_price_euro,                           -- PxlInvoices.UnitPriceEUR
+  ----- Exchange - UNIT Cost -----
+  CASE
+    WHEN invoices.currency_key = 'palziv-13' THEN invoices.unit_cost * cross_rates.cad
+    ELSE invoices.unit_cost * cross_rates.usd
+  END AS unit_cost_nis,                             -- PxlInvoices.UnitCostNIS
+  CASE
+    WHEN invoices.currency_key = 'palziv-13' THEN invoices.unit_cost * cross_rates.cad / cross_rates.usd
+    ELSE invoices.unit_cost
+  END AS unit_cost_usd,                             -- PxlInvoices.UnitCostUSD
+  CASE
+    WHEN invoices.currency_key = 'palziv-13' THEN invoices.unit_cost * cross_rates.cad / cross_rates.gbp
+    ELSE invoices.unit_cost * cross_rates.usd / cross_rates.gbp
+  END AS unit_cost_gbp,                             -- PxlInvoices.UnitCostGBP
+  CASE
+    WHEN invoices.currency_key = 'palziv-13' THEN invoices.unit_cost * cross_rates.cad / cross_rates.euro
+    ELSE invoices.unit_cost * cross_rates.usd / cross_rates.euro
+  END AS unit_cost_euro,                            -- PxlInvoices.UnitCostEUR
+  pxl_data.salesman,                                -- PxlInvoices.Sales_man
+  pxl_data.market,                                  -- PxlInvoices.Cust_Market
+  pxl_data.country,                                 -- PxlInvoices.CountryName
+FROM
+  pxl_invoices AS invoices
+LEFT JOIN 
+  `palziv-data-prod.modeling.modeling_fact_cross_rates` AS cross_rates ON DATE(invoices.date) = cross_rates.date
+FULL JOIN 
+  `palziv-data-prod.extrnal_files.pxl_data` AS pxl_data ON CONCAT(invoices.db_id, invoices.customer_descripsion) = CONCAT('pxl', pxl_data.customer)
+)

@@ -1,0 +1,66 @@
+config {
+  type: "view", 
+}
+
+CREATE VIEW `palziv-data-prod.modeling.modeling_fact_invoices_head` AS (
+SELECT 
+  invoices.invoice_db_id,                     -- Invoice.InvKey / InvoicesHeadToInvoiceAKey / InvoicesHeadToInvoiceItemsKey
+  invoices.db_id,                             -- Invoices.DB
+  invoices.invoice_number,                    -- Invoices.IvNum
+  invoices.invoice_date,                      -- Invoices.Date
+  CASE
+    WHEN invoices.debit = 'C' THEN -1
+    ELSE 1
+  END AS credit_or_debit,                     -- Invoices.CreditOrDebit
+  invoices.debit,                             -- Invoices.Debit
+  invoices.pay_date,                          -- Invoices.PayDate
+  invoices.qprice,                            -- Invoices.QPrice
+  invoices.t_percent,                         -- Inviices.HeaderTPercent
+  invoices.user_id,                           -- Invoices.TUser
+  invoices.tot_price,                         -- Invoices.TotPrice
+  invoices.updated_at,                        -- Invoices.HeadUDate
+  invoices.vat,                               -- Invoices.Vat
+  invoices.vat_price,                         -- Invoices.VatPrice
+  invoices.fnc_trans,                         -- Invoices.FncTrans
+  invoices.customer_id,                       -- Invoices.Cust
+  invoices.agent_id,                          -- Invoices.Agent
+  invoices.details,                           -- Invoices.Details                     
+  currencies.code,                            -- Invoices.Head_CurrCode
+  currencies.currency_name,                   -- Invoices.Head_CurrName
+  ivstats.status_descripsion,                 -- Invoices.Status
+  ivstats.status_id,                          -- Invoices.IvStat
+  ivstats.storno_flag,                        -- Invoices.StornoFlag
+  CASE
+    WHEN ivstats.storno_flag = 'Y' THEN 1
+    ELSE 0
+  END AS is_canceled,                         -- Invoices.Canceled?
+  -- Invoices.IvDes - absent from table invoice_type
+  ivtypes.english_invoice_descripsion,        -- Invoices.EIvDes  -   replace ivdes whice is absent
+  fnctrans.exchange_3,                        -- Invoices.Exchange3
+  currencies.exchange_rate,                   -- Invoices.Exchange
+  curregitems.cur_date,                       -- Invoices.CurregCurDate
+  curregitems.exchange,                       -- Invoices.CurregExchange
+  fnctrans.currency3,                         -- FncCurrency3
+  invoices.imp_file_id,                       -- Invoice.ImpFile
+  invoices.invoice_id,                        -- Invoice.IV
+FROM
+  `palziv-data-prod.dwh.dwh_invoices` AS invoices
+LEFT JOIN
+  `palziv-data-prod.dwh.dwh_fnctrans` AS fnctrans ON invoices.fnc_trans_db_id = fnctrans.fnc_trans_db_id AND fnctrans.fnc_trans_id <> 0
+LEFT JOIN
+  `palziv-data-prod.dwh.dwh_currencies` AS currencies ON invoices.currency_db_id = currencies.currency_db_id AND currencies.currency_id <> 0
+LEFT JOIN 
+  `palziv-data-prod.dwh.dwh_curregitems` AS curregitems ON invoices.currency_history_db_id = curregitems.currency_history_db_id AND curregitems.currency_id <> 0
+LEFT JOIN 
+  `palziv-data-prod.dwh.dwh_ivtypes` AS ivtypes ON invoices.type_db_id = ivtypes.type_db_id -- AND it.type_id <> 0 ??? type_id is string!
+LEFT JOIN
+  `palziv-data-prod.dwh.dwh_invoicesa` AS invoicesa ON invoices.invoice_db_id = invoicesa.invoice_db_id AND invoicesa.invoice_id <> 0
+LEFT JOIN 
+  `palziv-data-prod.dwh.dwh_ivstats` AS ivstats ON invoicesa.invoice_status_db_id = ivstats.invoice_status_db_id AND ivstats.status_id <> 0       
+WHERE invoices.invoice_date >= DATE(EXTRACT(year FROM CURRENT_DATE())- 5,1,1) 
+  AND invoices.invoice_id <> 0
+  AND invoices.final = 'Y'
+  AND invoices.type IN ('A', 'C', 'E', 'F')
+  AND (invoices.ztsv_qv_ignore <> 'Y' OR invoices.ztsv_qv_ignore IS NULL)
+  AND invoices.db_id IN  ('palziv', 'pna', 'foamot', 'puk', 'fomsrl', 'tropal', 'fommex', 'palmex')
+)

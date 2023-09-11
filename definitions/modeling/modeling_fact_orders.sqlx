@@ -1,0 +1,290 @@
+config {
+  type: "view", 
+}
+
+CREATE VIEW `palziv-data-prod.modeling.modeling_fact_orders` AS (
+WITH temp_orders AS (
+  SELECT 
+    order_lines.order_id,
+    order_head.order_db_id,
+    order_head.order_name_db_id,
+    order_lines.part_db_id,
+    order_head.customer_db_id,
+    order_lines.db_id,                                          -- Orders.DB
+    order_head.customer_id,                                     -- Orders.Cust
+    order_head.agent_id,                                        -- Orders.Agent
+    order_lines.part_id,                                        -- Orders.Part
+    order_head.created_at,                                      -- Orders.Date / OrdersToCrossRatesKey
+    order_head.order_name,                                      -- Orders.Order#
+    order_head.order_staus_descripsion,                         -- Orders.OrdStatusDes
+    order_head.zpal_approved,                                   -- Orders.ConfirmedFlag
+    order_head.q_price AS q_price_h,                            -- Orders.Head_QPrice
+    order_head.t_percent AS t_percent1,                         -- Orders.TPercent1
+    order_head.exchange_rate,                                   -- Orders.Exchange
+    order_head.code,                                            -- Orders.Head_CurrCode
+    order_head.currency_name,                                   -- Orders.Head_CurrName
+    order_head.cur_date,                                        -- Orders.CurregCurDate
+    order_head.exchange,                                        -- Orders.CurregExchange
+    order_head.head_exchange_rate,                              -- Orders.Head_ExchRate
+    order_head.order_type_code,                                 -- Orders.OrdTypeCode
+    order_head.order_type_descripsion,                          -- Orders.OrdTypeDes
+    order_lines.is_closed,                                      -- Orders.Closed
+    order_lines.currency,                                       -- Orders.Currency
+    order_lines.i_currency,                                     -- Orders.ICurrency
+    order_lines.i_exchange,                                     -- Orders.IExchange
+    order_lines.i_exchange_rate,                                -- Orders.IExch_Rate
+    CASE 
+      WHEN order_lines.i_currency = -1 THEN 1
+      ELSE order_lines.i_exchange_rate
+    END AS final_exchange_rate,                                 -- Orders.Final_Exch_Rate
+    order_lines.purchase_price * order_lines.t_quantity AS i_cur_line_cost,   -- Orders.ICurr_LineCost
+    CASE
+      WHEN order_lines.i_currency = -1 THEN order_lines.purchase_price * order_lines.t_quantity
+      ELSE order_lines.purchase_price * order_lines.t_quantity * order_lines.i_exchange_rate
+    END AS company_cur_line_cost,                                             -- Orders.CompanyCurr_LineCost
+    order_lines.price * ((100-order_head.t_percent) / 100) * ((100-order_lines.t_percent) / 100) * order_lines.t_quantity AS i_cur_line_price,   -- Orders.ICurr_LinePrice
+    CASE
+      WHEN order_lines.i_currency = -1 THEN order_lines.price * ((100-order_head.t_percent) / 100) * ((100-order_lines.t_percent) / 100) * order_lines.t_quantity
+      ELSE order_lines.price * ((100-order_head.t_percent) / 100) * ((100-order_lines.t_percent) / 100) * order_lines.t_quantity * order_lines.i_exchange_rate
+    END AS company_cur_line_price,                                            -- Orders.CompanyCurr_LinePrice	
+    order_lines.price * ((100-order_head.t_percent) / 100) * ((100-order_lines.t_percent) / 100) * order_lines.t_balance AS i_cur_line_balance,   -- Orders.ICurr_LineBalance
+    CASE
+      WHEN order_lines.i_currency = -1 THEN order_lines.price * ((100-order_head.t_percent) / 100) * ((100-order_lines.t_percent) / 100) * order_lines.t_balance
+      ELSE order_lines.price * ((100-order_head.t_percent) / 100) * ((100-order_lines.t_percent) / 100) * order_lines.t_balance * order_lines.i_exchange_rate
+    END AS company_cur_line_balance,                            -- Orders.CompanyCurr_LineBalance
+    order_lines.due_date,                                       -- Orders.DueDate
+    order_lines.abalance,                                       -- Orders.ABalance
+    order_head.updated_at,                                      -- Orders.LineUDate
+    order_lines.line,                                           -- Orders.Line
+    order_lines.price,                                          -- Orders.Price
+    order_lines.price_bal,                                      -- Orders.PriceBal
+    order_lines.purchase_price,                                 -- Orders.UnitCost
+    order_lines.q_price AS q_price_l,                           -- Orders.QPrice
+    order_lines.q_profit,                                       -- Orders.QProfit
+    order_lines.quant,                                          -- Orders.Quant
+    order_lines.t_percent AS t_percent2,                        -- OrderItems.TPercent2
+    order_lines.t_balance,                                      -- OrderItems.TBalance
+    order_lines.t_quantity,                                     -- OrderItems.TQuant
+    order_lines.unit_name,                                      -- Orders.TUnitName
+    order_lines.unit_description,                               -- Orders.TUnitDes
+    order_lines.english_unit_description,                       -- Orders.EUnitDes
+    order_lines.qv_sales_filter,                                -- Orders.FamilyFilterFlag         
+    order_lines.part_non_standard,                              -- Orders.PartNonStandard
+    cross_rates.usd,                                            -- Orders.USD                                                   
+    cross_rates.gbp,                                            -- Orders.GBP
+    cross_rates.euro,                                           -- Orders.EUR
+    cross_rates.ron,                                            -- Orders.RON
+    cross_rates.mxn                                             -- Orders.MXN
+  FROM 
+    `palziv-data-prod.modeling.modeling_fact_order_head` AS order_head
+  INNER JOIN 
+    `palziv-data-prod.modeling.modeling_fact_order_lines` AS order_lines ON order_head.order_db_id = order_lines.order_db_id
+  LEFT JOIN `palziv-data-prod.modeling.modeling_fact_cross_rates` AS cross_rates ON DATE(order_head.created_at) = cross_rates.date
+), orders AS (
+  SELECT 
+    order_id,
+    order_db_id,
+    order_name_db_id,
+    part_db_id,
+    customer_db_id,
+    db_id,                                                      -- Orders.DB
+    part_id,                                                    -- Orders.Part
+    customer_id,                                                -- Orders.Cust
+    agent_id,                                                   -- Orders.Agent
+    order_name,                                                 -- Orders.Order#
+    created_at,                                                 -- Orders.Date / OrdersToCrossRatesKey
+    due_date,                                                   -- Orders.DueDate
+    updated_at,                                                 -- Orders.LineUDate
+    is_closed,                                                  -- Orders.Closed
+    order_staus_descripsion,                                    -- Orders.OrdStatusDes
+    zpal_approved,                                              -- Orders.ConfirmedFlag
+    t_balance,                                                  -- OrderItems.TBalance
+    t_quantity,                                                 -- OrderItems.TQuant
+    unit_name,                                                  -- Orders.TUnitName
+    unit_description,                                           -- Orders.TUnitDes
+    english_unit_description,                                   -- Orders.EUnitDes
+    q_price_h,                                                  -- Orders.Head_QPrice
+    t_percent1,                                                 -- Orders.TPercent1
+    qv_sales_filter,                                            -- Orders.FamilyFilterFlag
+    part_non_standard,                                          -- Orders.PartNonStandard
+    exchange_rate,                                              -- Orders.Exchange
+    code,                                                       -- Orders.Head_CurrCode
+    currency_name,                                              -- Orders.Head_CurrName
+    cur_date,                                                   -- Orders.CurregCurDate
+    exchange,                                                   -- Orders.CurregExchange
+    order_type_code,                                            -- Orders.OrdTypeCode
+    order_type_descripsion,                                     -- Orders.OrdTypeDes
+    abalance,                                                   -- Orders.ABalance
+    currency,                                                   -- Orders.Currency
+    i_currency,                                                 -- Orders.ICurrency
+    i_exchange,                                                 -- Orders.IExchange
+    i_exchange_rate,                                            -- Orders.IExch_Rate
+    final_exchange_rate,
+    line,                                                       -- Orders.Line
+    price,                                                      -- Orders.Price
+    price_bal,                                                  -- Orders.PriceBal
+    purchase_price,                                             -- Orders.UnitCost
+    q_price_l,                                                  -- Orders.QPrice
+    q_profit,                                                   -- Orders.QProfit
+    quant,                                                      -- Orders.Quant
+    t_percent2,                                                 -- Orders.TPercent2
+    -------------------- Line Cost --------------------
+    CASE
+      WHEN CONCAT(db_id, '_', i_currency) IN ('pna_-2', 'puk_-2', 'fomsrl_42', 'tropal_42', 'fommex_42', 'palmex_42') THEN i_cur_line_cost
+      WHEN db_id IN ('palziv', 'foamot') THEN company_cur_line_cost
+      WHEN db_id =  'pna' THEN company_cur_line_cost * usd
+      WHEN db_id =  'puk' THEN company_cur_line_cost * gbp
+      WHEN db_id IN ('fomsrl', 'tropal') THEN company_cur_line_cost * ron
+      ELSE company_cur_line_cost * mxn
+    END AS line_cost_NIS,
+    CASE
+      WHEN CONCAT(db_id, '_', i_currency) IN ('palziv_-2','foamot_-2', 'puk_109', 'fomsrl_109', 'tropal_109', 'fommex_-2', 'palmex_-2') THEN i_cur_line_cost
+      WHEN db_id IN ('palziv', 'foamot') THEN company_cur_line_cost / usd
+      WHEN db_id =  'pna' THEN company_cur_line_cost
+      WHEN db_id =  'puk' THEN company_cur_line_cost * gbp / usd
+      WHEN db_id IN ('fomsrl', 'tropal') THEN company_cur_line_cost * ron / usd
+      ELSE company_cur_line_cost * mxn / usd
+    END AS line_cost_USD,
+    CASE
+      WHEN CONCAT(db_id, '_', i_currency) IN ('palziv_30','foamot_30', 'pna_30', 'fomsrl_30', 'tropal_30', 'fommex_30', 'palmex_30') THEN i_cur_line_cost
+      WHEN db_id IN ('palziv', 'foamot') THEN company_cur_line_cost / gbp
+      WHEN db_id =  'pna' THEN company_cur_line_cost / gbp
+      WHEN db_id =  'puk' THEN company_cur_line_cost
+      WHEN db_id IN ('fomsrl', 'tropal') THEN company_cur_line_cost * ron / gbp
+      ELSE company_cur_line_cost * mxn / gbp
+    END AS line_cost_GBP,
+    CASE
+      WHEN CONCAT(db_id, '_', i_currency) IN ('palziv_29','foamot_29', 'pna_29', 'puk_29', 'fomsrl_-2', 'tropal_-2', 'fommex_109', 'palmex_109') THEN i_cur_line_cost
+      WHEN db_id IN ('palziv', 'foamot') THEN company_cur_line_cost / euro
+      WHEN db_id =  'pna' THEN company_cur_line_cost * usd / euro
+      WHEN db_id =  'puk' THEN company_cur_line_cost * gbp / euro
+      WHEN db_id IN ('fomsrl', 'tropal') THEN company_cur_line_cost * ron / euro
+      ELSE company_cur_line_cost * mxn / euro
+    END AS line_cost_EUR,
+    -------------------- Line Total --------------------
+    CASE
+      WHEN CONCAT(db_id, '_', i_currency) IN ('pna_-2', 'puk_-2', 'fomsrl_42', 'tropal_42', 'fommex_42', 'palmex_42') THEN i_cur_line_price
+      WHEN db_id IN ('palziv', 'foamot') THEN company_cur_line_price
+      WHEN db_id =  'pna' THEN company_cur_line_price * usd
+      WHEN db_id =  'puk' THEN company_cur_line_price * gbp
+      WHEN db_id IN ('fomsrl', 'tropal') THEN company_cur_line_price * ron
+      ELSE company_cur_line_price * mxn
+    END AS line_total_NIS,
+    CASE
+      WHEN CONCAT(db_id, '_', i_currency) IN ('palziv_-2','foamot_-2', 'puk_109', 'fomsrl_109', 'tropal_109', 'fommex_-2', 'palmex_-2') THEN i_cur_line_price
+      WHEN db_id IN ('palziv', 'foamot') THEN company_cur_line_price / usd
+      WHEN db_id =  'pna' THEN company_cur_line_price
+      WHEN db_id =  'puk' THEN company_cur_line_price * gbp / usd
+      WHEN db_id IN ('fomsrl', 'tropal') THEN company_cur_line_price * ron / usd
+      ELSE company_cur_line_price * mxn / usd
+    END AS line_total_USD,
+    CASE
+      WHEN CONCAT(db_id, '_', i_currency) IN ('palziv_30','foamot_30', 'pna_30', 'fomsrl_30', 'tropal_30', 'fommex_30', 'palmex_30') THEN i_cur_line_price
+      WHEN db_id IN ('palziv', 'foamot') THEN company_cur_line_price / gbp
+      WHEN db_id =  'pna' THEN company_cur_line_price * usd / gbp
+      WHEN db_id =  'puk' THEN company_cur_line_price
+      WHEN db_id IN ('fomsrl', 'tropal') THEN company_cur_line_price * ron / gbp
+      ELSE company_cur_line_price * mxn / gbp
+    END AS line_total_GBP,
+    CASE
+      WHEN CONCAT(db_id, '_', i_currency) IN ('palziv_29','foamot_29', 'pna_29', 'puk_29', 'fomsrl_-2', 'tropal_-2', 'fommex_109', 'palmex_109') THEN i_cur_line_price
+      WHEN db_id IN ('palziv', 'foamot') THEN company_cur_line_price / euro
+      WHEN db_id =  'pna' THEN company_cur_line_price * usd / euro
+      WHEN db_id =  'puk' THEN company_cur_line_price * gbp / euro
+      WHEN db_id IN ('fomsrl', 'tropal') THEN company_cur_line_price * ron / euro
+      ELSE company_cur_line_price * mxn / euro
+    END AS line_total_EUR,
+    -------------------- Line Balance --------------------
+    CASE
+      WHEN CONCAT(db_id, '_', i_currency) IN ('pna_-2', 'puk_-2', 'fomsrl_42', 'tropal_42', 'fommex_42', 'palmex_42') THEN i_cur_line_price
+      WHEN db_id IN ('palziv', 'foamot') THEN company_cur_line_balance
+      WHEN db_id =  'pna' THEN company_cur_line_balance * usd
+      WHEN db_id =  'puk' THEN company_cur_line_balance * gbp
+      WHEN db_id IN ('fomsrl', 'tropal') THEN company_cur_line_balance * ron
+      ELSE company_cur_line_balance * mxn
+    END AS line_balance_NIS,
+    CASE
+      WHEN CONCAT(db_id, '_', i_currency) IN ('palziv_-2','foamot_-2', 'puk_109', 'fomsrl_109', 'tropal_109', 'fommex_-2', 'palmex_-2') THEN i_cur_line_balance
+      WHEN db_id IN ('palziv', 'foamot') THEN company_cur_line_balance / usd
+      WHEN db_id =  'pna' THEN company_cur_line_balance
+      WHEN db_id =  'puk' THEN company_cur_line_balance * gbp / usd
+      WHEN db_id IN ('fomsrl', 'tropal') THEN company_cur_line_balance * ron / usd
+      ELSE company_cur_line_balance * mxn / usd
+    END AS line_balance_USD,
+    CASE
+      WHEN CONCAT(db_id, '_', i_currency) IN ('palziv_30','foamot_30', 'pna_30', 'fomsrl_30', 'tropal_30', 'fommex_30', 'palmex_30') THEN i_cur_line_balance
+      WHEN db_id IN ('palziv', 'foamot') THEN company_cur_line_balance / gbp
+      WHEN db_id =  'pna' THEN company_cur_line_balance * usd / gbp
+      WHEN db_id =  'puk' THEN company_cur_line_balance
+      WHEN db_id IN ('fomsrl', 'tropal') THEN company_cur_line_balance * ron / gbp
+      ELSE company_cur_line_balance * mxn / gbp
+    END AS line_balance_GBP,
+    CASE
+      WHEN CONCAT(db_id, '_', i_currency) IN ('palziv_29','foamot_29', 'pna_29', 'puk_29', 'fomsrl_-2', 'tropal_-2', 'fommex_109', 'palmex_109') THEN i_cur_line_balance
+      WHEN db_id IN ('palziv', 'foamot') THEN company_cur_line_balance / euro
+      WHEN db_id =  'pna' THEN company_cur_line_balance * usd / euro
+      WHEN db_id =  'puk' THEN company_cur_line_balance * gbp / euro
+      WHEN db_id IN ('fomsrl', 'tropal') THEN company_cur_line_balance * ron / euro
+      ELSE company_cur_line_balance * mxn / euro
+    END AS line_balance_EUR,
+  FROM temp_orders
+)
+SELECT
+  order_id,
+  CONCAT(db_id, '_', agent_id) AS agent_db_id,
+  CONCAT(db_id, '_', order_name, '_', line) AS order_name_line_db_id,  -- Orders.OrderOrdKeyForClass
+  CONCAT(db_id, '_', customer_id, '_', agent_id, '_', part_id, '_', created_at) AS orders_customer_agent_part_date_db_id,  -- SalesKeyTableToOrdersKey
+  order_db_id,
+  order_name_db_id,
+  part_db_id,
+  customer_db_id,
+  db_id,                                                           -- Orders.DB
+  part_id,                                                         -- Orders.Part
+  customer_id,                                                     -- Orders.Cust
+  agent_id,                                                        -- Orders.Agent
+  order_name,                                                      -- Order#
+  created_at,                                                      -- Orders.Date 
+  due_date,                                                        -- Orders.DueDate / OrdersToOrdersDueDateCalendarKey
+  updated_at,                                                      -- Orders.LineUDate / OrdersToOrdersLineUDateCalendarKey
+  is_closed,                                                       -- Orders.Closed
+  CASE 
+    WHEN is_closed THEN 'Closed'
+    ELSE  'Open'
+  END AS open_orders,                                              -- OpenOrders
+  order_staus_descripsion,                                         -- Ord_Status
+  zpal_approved,                                                   -- Ord_Confirmed?
+  t_balance,                                                       -- Ord_Balance
+  t_quantity,                                                      -- Ord_Quant
+  unit_name,                                                       -- Orders.TUnitName
+  unit_description,                                                -- Orders.TUnitDes
+  english_unit_description,                                        -- Ord_Unit
+  abalance,                                                        -- Orders.ABalance
+  order_type_code,                                                 -- Orders.OrdTypeCode
+  order_type_descripsion,                                          -- Ord_Type
+  line,                                                            -- Ord_Row
+  price,                                                           -- Orders.Price
+  price_bal,                                                       -- Orders.PriceBal
+  purchase_price,                                                  -- Orders.UnitCost
+  -------------------- Line Cost --------------------
+  line_cost_NIS,                                                   -- Orders.LineCostNIS
+  line_cost_USD,                                                   -- Orders.LineCostUSD
+  line_cost_GBP,                                                   -- Orders.LineCostGBP
+  line_cost_EUR,                                                   -- Orders.LineCostEUR
+  -------------------- Line Total --------------------
+  line_total_NIS,                                                  -- Orders.LineTotalNIS
+  line_total_USD,                                                  -- Orders.LineTotalUSD
+  line_total_GBP,                                                  -- Orders.LineTotalGBP
+  line_total_EUR,                                                  -- Orders.LineTotalEUR
+  -------------------- Line Balance --------------------
+  line_balance_NIS,                                                -- Orders.LineBalanceNIS
+  line_balance_USD,                                                -- Orders.LineBalanceUSD
+  line_balance_GBP,                                                -- Orders.LineBalanceGBP
+  line_balance_EUR,                                                -- Orders.LineBalanceEUR
+  ----------------------------------------------------------------------------------------------
+  CASE
+    WHEN qv_sales_filter = 1 THEN 1
+    ELSE 0
+  END AS qv_sales_filter,                                          -- Orders.FamilyFilterFlag
+  part_non_standard                                                -- Orders.PartNonStandard
+FROM orders
+)

@@ -1,0 +1,201 @@
+config {
+  type: "view", 
+}
+
+CREATE VIEW `palziv-data-prod.modeling.modeling_dim_parts` AS (
+WITH 
+pxl_invoices AS (
+  SELECT DISTINCT 
+    db_id,
+    part_descripsion,
+    part_name,
+    product_family,
+    part_weight,
+    basic_material,
+    part_vol_board_foot,
+  FROM `palziv-data-prod.modeling.modeling_fact_pxl_invoices` 
+),
+parts AS (
+  SELECT 
+    parts.part_db_id,                                      
+    parts.db_id,                                          -- Part.DB
+    CAST(parts.part_id AS STRING) AS part_id,             -- Part.Part
+    parts.type,                                           -- Part.Type
+    parts.part_name,                                      -- Part_# 
+    IFNULL(partdes.english_part_description, parts.part_description) AS part_description,  -- Part 
+    partdes.english_part_description,                     -- Part.EPartDes
+    family.family_name,                                   -- [Family_#]
+    family.qv_sales_filter,                               -- Part.FamilyFilterFlag
+    unit.unit_name,                                       -- [Unit]
+    parts.sern_type,                                      -- Part.MoldType
+    family.family_description,                            -- Family
+    partspec.spec1_family,                                -- Part.Spec1Family
+    specvalues_1.spec_value_descripsion AS product_type,           -- Part.ProductType
+    specvalues_2.spec_value_english_descripsion AS product_line,   -- Part.ProductLines
+    specvalues_18.spec_value_descripsion AS major_product_line,    -- Part.MajorProductLine
+    partspec.main_routing,                               -- Part.MainRouting
+    prtroutetype.route_description,                      -- Part.RouteType
+    partspec.basic_material,                             -- Part.BasicMaterial
+    partspec.weight,                                     -- Part.Weight
+    partspec.additive,                                   -- Part.Additive
+    partspec.color,                                      -- Part.Color
+    partspec.thickness,                                  -- Part.Thickness
+    partspec.width,                                      -- Part.Width
+    partspec.length,                                     -- Part.Length
+    partparam.safety_stock,                              -- Part.SafetyStock
+    volinconttype.volume_cbm,                            -- Part.VolumeInContainerM3
+    cmplxlevel.complex_level_description,                -- Part.ComplexLevel
+    m_parts.part_name AS m_part_name,                    -- [Base Part#]
+    parts.conversion_rate,                               -- Part.Conv => For new feature
+    parts.currency,                                      -- Part.Currency
+    parts.part_final_conv,                               -- Part.FinalConv
+    partparam.ns_flag,                                   -- Part.NonStandardFlag
+    partparam.kg_weight,                                 -- Part.PartParamKgWeight 
+    partparam.lbs_weight,                                -- Part.PartParamLbsWeight
+    partparam.volume_cubic_meter,                        -- Part.VolumeCubicMeter
+    partparam.volume_board_foot,                         -- Part.VolumeBoardFoot 
+    parts.cost,                                          -- Part.Cost
+    parts.std_cost,                                      -- Part.StdCost 
+    m_partdes.english_part_description AS m_part_english_description, -- Part.MPartEDes
+    m_parts.part_description AS m_part_description,      -- Part.MPartDes
+    -- projitems.part_project_key                           -- PartToProjectKey  --- JOIN CREATES DUPLICATES
+  FROM 
+    `palziv-data-prod.dwh.dwh_part` AS parts 
+  LEFT JOIN
+    `palziv-data-prod.dwh.dwh_partdes` AS partdes ON parts.part_db_id = partdes.part_db_id
+  LEFT JOIN
+    `palziv-data-prod.dwh.dwh_partparam` AS partparam ON parts.part_db_id = partparam.part_db_id 
+  LEFT JOIN
+    `palziv-data-prod.dwh.dwh_partspec` AS partspec ON parts.part_db_id = partspec.part_db_id 
+  LEFT JOIN
+    `palziv-data-prod.dwh.dwh_specvalues` AS specvalues_1 ON partspec.part_spec_to_spece_values_1key = specvalues_1.spec_value_db_id AND specvalues_1.spec_number = 1 
+  LEFT JOIN
+    `palziv-data-prod.dwh.dwh_specvalues` AS specvalues_2 ON partspec.part_spec_to_spece_values_2key = specvalues_2.spec_value_db_id AND specvalues_2.spec_number = 2 
+  LEFT JOIN
+    `palziv-data-prod.dwh.dwh_specvalues` AS specvalues_18 ON partspec.part_spec_to_spece_values_18key = specvalues_18.spec_value_db_id AND specvalues_18.spec_number = 18 
+  LEFT JOIN
+    `palziv-data-prod.dwh.dwh_family` AS family ON parts.family_db_id = family.family_db_id 
+  LEFT JOIN
+    `palziv-data-prod.dwh.dwh_unit` AS unit ON parts.unit_db_id = unit.unit_db_id 
+  LEFT JOIN
+    `palziv-data-prod.dwh.dwh_part` AS m_parts ON parts.part_mpart_key = m_parts.part_db_id 
+  LEFT JOIN 
+    `palziv-data-prod.dwh.dwh_partdes` AS m_partdes ON parts.part_mpart_key = m_partdes.part_db_id 
+  LEFT JOIN
+    `palziv-data-prod.dwh.dwh_ztsv_prtroutetype` AS prtroutetype ON specvalues_18.route_type_db_id = prtroutetype.part_route_type_db_id 
+  LEFT JOIN
+    `palziv-data-prod.dwh.dwh_ztsv_volinconttype` AS volinconttype ON partparam.volume_container_type_db_id = volinconttype.volume_container_type_db_id 
+  LEFT JOIN
+    `palziv-data-prod.dwh.dwh_ztsv_cmplxlevel` AS cmplxlevel ON partparam.complex_level_db_id = cmplxlevel.complex_level_db_id 
+  -- LEFT JOIN
+  --   `palziv-data-prod.dwh.dwh_projitems` AS projitems ON parts.part_db_id = projitems.part_db_id     -- CREATES DUPLICATES!
+  WHERE
+    parts.part_id <> 0
+    AND parts.db_id in ('palziv', 'pna', 'foamot', 'puk', 'fomsrl', 'tropal','fommex','palmex') 
+  UNION ALL
+  SELECT
+    CONCAT(db_id, '_',part_name, '_', part_descripsion) AS part_db_id,  
+    db_id,                                                -- Part.DB
+    CONCAT(part_name, '_', part_descripsion) AS part_id,  -- Part.Part
+    NULL AS type,                                         -- Part.Type
+    part_name,                                            -- Part_# 
+    NULL AS english_part_description,                     -- Part.EPartDes
+    part_descripsion AS part_description,                 -- Part
+    NULL AS family_name,                                  -- [Family_#]
+    0 AS qv_sales_filter,                                 -- Part.FamilyFilterFlag
+    NULL AS unit_name,                                    -- [Unit]
+    NULL AS sern_type,                                    -- Part.MoldType
+    NULL AS family_description,                           -- Family
+    product_family AS spec1_family,                       -- Part.Spec1Family
+    NULL AS product_type,                                 -- Part.ProductType
+    'B2C' AS product_line,                                -- Part.ProductLines
+    NULL AS major_product_line,                           -- Part.MajorProductLine
+    NULL AS main_routing,                                 -- Part.MainRouting
+    NULL AS route_description,                            -- Part.RouteType
+    basic_material,                                       -- Part.BasicMaterial
+    CAST(part_weight AS STRING) AS weight,                -- Part.Weight
+    NULL AS additive,                                     -- Part.Additive
+    NULL AS color,                                        -- Part.Color
+    NULL AS thickness,                                    -- Part.Thickness
+    NULL AS width,                                        -- Part.Width
+    NULL AS length,                                       -- Part.Length
+    NULL AS safety_stock,                                 -- Part.SafetyStock
+    NULL AS volume_cbm,                                   -- Part.VolumeInContainerM3
+    NULL AS complex_level_description,                    -- Part.ComplexLevel
+    NULL AS m_part_name,                                  -- [Base Part#]
+    NULL AS conversion_rate,                              -- Part.Conv
+    NULL AS currency,                                     -- Part.Currency
+    NULL AS part_final_conv,                              -- Part.FinalConv
+    NULL AS ns_flag,                                      -- Part.NonStandardFlag
+    NULL AS kg_weight,                                    -- Part.PartParamKgWeight 
+    NULL AS lbs_weight,                                   -- Part.PartParamLbsWeight
+    CAST(part_vol_board_foot AS FLOAT64) * 0.002359737 AS volume_cubic_meter,          -- Part.VolumeCubicMeter
+    CAST(part_vol_board_foot AS FLOAT64) AS volume_board_foot,                         -- Part.VolumeBoardFoot 
+    NULL AS cost,                                         -- Part.Cost
+    NULL AS std_cost,                                     -- Part.StdCost 
+    NULL AS m_part_english_description,                   -- Part.MPartEDes
+    NULL AS m_part_description,                           -- Part.MPartDes
+    -- NULL AS part_project_key                              -- PartToProjectKey  --- JOIN CREATES DUPLICATES
+  FROM 
+    pxl_invoices
+  WHERE 
+    CONCAT(db_id, '_',part_name, '_', part_descripsion) IS NOT NULL
+)
+
+SELECT DISTINCT 
+  parts.part_db_id,                                         -- PartToTecPartsKey / PartToWarehousesBalanceKey / SalesKeyTableToPartKey
+  parts.db_id,                                              -- Part.DB
+  parts.part_id,                                            -- Part.Part
+  parts.type,                                               -- Part.Type
+  IFNULL(parts.part_name, 'Unknown') AS part_name,        -- Part_# 
+  IFNULL(english_part_description, 'Unknown') AS english_part_description,   -- Part.EPartDes
+  parts.part_description,                                   -- Part
+  parts.family_name,                                        -- [Family_#]
+  parts.unit_name,                                          -- [Unit]
+  CASE
+    WHEN parts.qv_sales_filter = 1 THEN 1
+    ELSE 0
+  END AS qv_sales_filter,                                   -- Part.FamilyFilterFlag
+  CASE
+    WHEN db_id IN ('foamot', 'fomsrl', 'fommex') AND parts.sern_type IS NOT NULL THEN 1
+    ELSE 0
+  END AS foamotive_molds_flag,                              -- Part.FoamotiveMoldsFlag
+  parts.sern_type,                                          -- Part.MoldType
+  parts.family_description,                                 -- Family
+  IFNULL(parts.spec1_family, 'Unknown') AS spec1_family,  -- Part.Spec1Family
+  IFNULL(parts.product_type, 'Unknown') AS product_type,  -- Part.ProductType
+  IFNULL(product_line, 'Unknown') AS product_line,        -- Part.ProductLines
+  IFNULL(parts.major_product_line, 'Unknown') AS major_product_line,                -- Part.MajorProductLine
+  IFNULL(parts.main_routing, 'Unknown') AS main_routing,                            -- Part.MainRouting
+  parts.route_description,                                                            -- Part.RouteType
+  IFNULL(parts.basic_material, 'Unknown') AS basic_material,                        -- Part.BasicMaterial
+  IFNULL(parts.weight, 'Unknown') AS weight,                                        -- Part.Weight
+  IFNULL(parts.additive, 'Unknown') AS additive,                                    -- Part.Additive
+  IFNULL(parts.color, 'Unknown') AS color,                                          -- Part.Color
+  IFNULL(parts.thickness, 'Unknown') AS thickness,                                  -- Part.Thickness
+  IFNULL(parts.width, 'Unknown') AS width,                                          -- Part.Width
+  IFNULL(parts.length, 'Unknown') AS length,                                        -- Part.Length
+  parts.safety_stock,                                                                 -- Part.SafetyStock
+  parts.volume_cbm,                                                                   -- Part.VolumeInContainerM3
+  IFNULL(parts.complex_level_description, 'Unknown') AS complex_level_description,  -- Part.ComplexLevel
+  parts.m_part_name,                                                                  -- [Base Part#]
+  IFNULL(parts.m_part_english_description, parts.m_part_description) AS m_part_description,  -- [Base Part]          
+  CASE
+    WHEN CONCAT(parts.db_id, '_', parts.part_name) IN ('pxl_ECF75T3B6', 'pxl_ECF100T3B6', 'pxl_ECF75T3B6-01', 'pna_220000503', 'pna_2200000135') THEN 1
+    WHEN parts.db_id = 'pxl' AND parts.part_name IN ('CCC07MM-6X8', 'CCC07MM-6X30', 'CCC10MM-6X8', 'CCC10MM-6X30', 'EF20RT8', 'EF26RT9', 'EF220RT9') THEN 2
+    ELSE NULL
+  END AS home_depot_type,                                   -- Part.HomeDepotType
+  parts.conversion_rate,                                    -- Part.Conv
+  parts.currency,                                           -- Part.Currency
+  parts.part_final_conv,                                    -- Part.FinalConv
+  parts.ns_flag,                                            -- Part.NonStandardFlag
+  parts.kg_weight,                                          -- Part.PartParamKgWeight 
+  parts.lbs_weight,                                         -- Part.PartParamLbsWeight
+  parts.volume_cubic_meter,                                 -- Part.VolumeCubicMeter
+  parts.volume_board_foot,                                  -- Part.VolumeBoardFoot 
+  parts.cost,                                               -- Part.Cost
+  parts.std_cost,                                           -- Part.StdCost 
+  -- parts.part_project_key,                                   -- PartToProjectKey  
+FROM 
+  parts
+)

@@ -1,0 +1,59 @@
+config {
+  type: "view", 
+}
+
+CREATE VIEW `palziv-data-prod.modeling.modeling_dim_agent` AS (
+WITH 
+agent AS (
+  SELECT 
+    agents.agent_db_id,                                                           -- AgentsToAgentArcKey
+    agents.db_id,                                                                 -- Agent.DB
+    CAST(agents.agent_id AS STRING) AS agent_id,                                  -- Agent.Agent
+    CAST(agents.agent_code AS STRING) AS agent_code,                              -- Agent.Sales_Code
+    agents.agent_name,                                                            -- Agent.Sales_man
+    agents.commission,                                                            -- Agent.Commission
+    agents.addres,                                                                -- Agent.Address
+    agents.phone,                                                                 -- Agent.Phone
+    agents.email,                                                                 -- Agent.Email
+    agents.in_active,                                                             -- Agent.Inactive
+    CAST(father_agents.agent_code AS STRING) AS father_agent_code,                -- Agent.FatherSales_Code
+    CAST(father_agents.agent_name AS STRING) AS father_agent_name,                -- Agent.FatherSales_man
+  FROM 
+    `palziv-data-prod.dwh.dwh_agents` AS agents
+  LEFT JOIN
+    `palziv-data-prod.dwh.dwh_agentarc` AS agentarc ON agents.agent_db_id = agentarc.agent_db_id 
+    AND agentarc.agent_id <> 0
+  LEFT JOIN 
+    `palziv-data-prod.dwh.dwh_agents` AS father_agents ON CONCAT(agentarc.db_id, '_', agentarc.father_agent_id) = father_agents.agent_db_id 
+    AND father_agents.agent_id <> 0
+  WHERE 
+    agents.db_id IN ('palziv', 'pna', 'foamot', 'puk', 'fomsrl', 'tropal','fommex','palmex')
+  UNION ALL
+  SELECT DISTINCT
+    CONCAT(db_id, '_', salesman) AS agent_db_id,                                  -- AgentsToAgentArcKey
+    db_id,                                                                        -- Agent.DB
+    salesman AS agent_id,                                                         -- Agent.Agent
+    'Unknown' AS agent_code,                                                      -- Agent.Sales_Code  
+    salesman AS agent_name,                                                       -- Agent.Sales_man             
+    NULL AS commission,                                                           -- Agent.Commission
+    CAST(NULL AS STRING) AS addres,                                               -- Agent.Address
+    CAST(NULL AS STRING) AS phone,                                                -- Agent.Phone
+    CAST(NULL AS STRING) AS email,                                                -- Agent.Email
+    CAST(NULL AS STRING) AS in_active,                                            -- Agent.Inactive
+    'Unknown' AS father_agent_code,                                               -- Agent.FatherSales_Code
+    'Unknown' AS father_agent_name,                                               -- Agent.FatherSales_man
+  FROM
+    `palziv-data-prod.modeling.modeling_fact_pxl_invoices`
+  WHERE 
+    CONCAT(db_id, '_', salesman) IS NOT NULL
+)
+SELECT 
+  agent_db_id,                                                                    -- AgentsToAgentArcKey
+  db_id,                                                                          -- Agent.DB
+  agent_id,                                                                       -- Agent.Agent
+  agent_code,                                                                     -- Sales Rep. #
+  IFNULL(agent_name, 'Unknown') AS agent_name,                                    -- Sales Rep.
+  COALESCE(father_agent_code, agent_code, 'Unknown') AS agent_director_code,      -- Sales Director # 
+  COALESCE(father_agent_name, agent_name, 'Unknown') AS agent_director_name,      -- Sales Director                  
+FROM agent
+)

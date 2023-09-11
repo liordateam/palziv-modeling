@@ -1,0 +1,19 @@
+config {
+  type: "view",
+}
+
+CREATE VIEW `palziv-data-prod.modeling.modeling_dim_current_currency` AS (
+SELECT 
+  currency_db_id,                                               -- Curr.Currency
+  CONCAT(currency_db_id, '_', exchange_date) AS currency_key,   -- CurrencyKey
+  db_id,                                                        -- Curr.DB,
+  exchange_rate,                                                -- Curr.Exchange
+  exchange_date,                                                -- Curr.ExchDate
+  code,
+  english_name
+FROM
+  `palziv-data-prod.dwh.dwh_currencies`
+WHERE
+  currency_db_id in ('palziv_-2', 'palziv_13','palziv_29', 'palziv_30', 'palziv_88','palziv_70' )
+  AND exchange_date > DATE((EXTRACT(YEAR FROM CURRENT_DATE())-5), 1, 1)
+)

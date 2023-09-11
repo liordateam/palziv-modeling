@@ -1,0 +1,21 @@
+config {
+  type: "view", 
+}
+
+CREATE VIEW `palziv-data-prod.modeling.modeling_dim_exchange_rate` AS (
+WITH
+current_currency AS (
+    SELECT exchange_rate, currency_db_id from `palziv-data-prod.modeling.modeling_dim_current_currency`
+)
+
+SELECT
+  `palziv_29` AS euro,
+  `palziv_-2` AS usd,
+  `palziv_13` AS cad,
+  `palziv_88` AS ron,
+  `palziv_70` AS mxn,
+  `palziv_30` AS gbp
+FROM
+  current_currency
+PIVOT(SUM(exchange_rate) FOR currency_db_id IN ('palziv_29', 'palziv_-2', 'palziv_13', 'palziv_88', 'palziv_70', 'palziv_30'))
+)

@@ -1,0 +1,135 @@
+config {
+  type: "view", 
+}
+
+CREATE VIEW `palziv-data-prod.modeling.modeling_fact_aging_customers` AS (
+WITH 
+pxl_invoices AS (
+  SELECT DISTINCT 
+    db_id,
+    customer_descripsion,
+    salesman,
+    market,
+    country,
+  FROM 
+    `palziv-data-prod.modeling.modeling_fact_pxl_invoices` 
+)
+
+SELECT 
+  customers.customer_db_id,                         -- CustomersToCustomerClassificationKey / SalesKeyTableToCustomersKey
+  customers.agent_db_id,                            
+  CONCAT(customers.db_id, '_', customers.customer_id, '_', customers.agent_id) AS customer_agent_db_id,  -- SalesKeyTableToAgingAndObligoAndAgingCustomersKey
+  CAST(customers.customer_id AS STRING) AS customer_id,   -- AgingCustomers.Cust
+  customers.db_id,                                  -- AgingCustomers.DB
+  CAST(customers.agent_id AS STRING) AS agent_id,   -- AgingCustomers.Agent
+  CASE 
+    WHEN obligo.currency_id <> 0 THEN obligo.currency_id
+    ELSE customers.currency_id
+  END AS obligo_currency,                    -- AgingCustomers.ObligoCurrency
+  currencies.code AS currency_code,          -- AgingCustomers.ObligoCurrencyCode
+  currencies.exchange_rate,                  -- AgingCustomers.ObligoExchangeRate
+  -----------------------------------------
+  --  vLastExchangeUSD = 'palziv_-2')
+  --  vLastExchangeCAD = 'palziv_13')
+  --  vLastExchangeEUR = 'palziv_29')
+  --  vLastExchangeGBP = 'palziv_30')
+  --  vLastExchangeRON = 'palziv_88')
+  --  vLastExchangeMXN = 'palziv_70')
+  CASE  
+    WHEN customers.db_id IN ('palziv', 'foamot') THEN obligo.max_obligo * currencies.exchange_rate 
+    WHEN customers.db_id = 'pna' THEN obligo.max_obligo * currencies.exchange_rate * exchange_rate.usd
+    WHEN customers.db_id = 'puk' THEN obligo.max_obligo * currencies.exchange_rate * exchange_rate.gbp 
+    WHEN customers.db_id IN ('fomsrl', 'tropal') THEN obligo.max_obligo * currencies.exchange_rate * exchange_rate.ron 
+    ELSE obligo.max_obligo * currencies.exchange_rate * exchange_rate.mxn
+  END AS max_obligo_NIS,                     -- Customers.MaxObligoNIS
+  CASE  
+    WHEN customers.db_id IN ('palziv', 'foamot') THEN obligo.max_obligo * currencies.exchange_rate / exchange_rate.usd 
+    WHEN customers.db_id = 'pna' THEN obligo.max_obligo * currencies.exchange_rate 
+    WHEN customers.db_id = 'puk' THEN obligo.max_obligo * currencies.exchange_rate * exchange_rate.gbp / exchange_rate.usd
+    WHEN customers.db_id IN ('fomsrl', 'tropal') THEN obligo.max_obligo * currencies.exchange_rate * exchange_rate.ron / exchange_rate.usd 
+    ELSE obligo.max_obligo * currencies.exchange_rate * exchange_rate.mxn / exchange_rate.usd
+  END AS max_obligo_USD,                     -- Customers.MaxObligoUSD
+  CASE  
+    WHEN customers.db_id IN ('palziv', 'foamot') THEN obligo.max_obligo * currencies.exchange_rate / exchange_rate.gbp
+    WHEN customers.db_id = 'pna' THEN obligo.max_obligo * currencies.exchange_rate * exchange_rate.usd / exchange_rate.gbp 
+    WHEN customers.db_id = 'puk' THEN obligo.max_obligo * currencies.exchange_rate 
+    WHEN customers.db_id IN ('fomsrl', 'tropal') THEN obligo.max_obligo * currencies.exchange_rate * exchange_rate.ron / exchange_rate.gbp 
+    ELSE obligo.max_obligo * currencies.exchange_rate * exchange_rate.mxn / exchange_rate.gbp
+  END AS max_obligo_GBP,                     -- Customers.MaxObligoGBP
+  CASE  
+    WHEN customers.db_id IN ('palziv', 'foamot') THEN obligo.max_obligo * currencies.exchange_rate / exchange_rate.euro 
+    WHEN customers.db_id = 'pna' THEN obligo.max_obligo * currencies.exchange_rate * exchange_rate.usd / exchange_rate.euro 
+    WHEN customers.db_id = 'puk' THEN obligo.max_obligo * currencies.exchange_rate * exchange_rate.gbp / exchange_rate.euro 
+    WHEN customers.db_id IN ('fomsrl', 'tropal') THEN obligo.max_obligo * currencies.exchange_rate * exchange_rate.ron / exchange_rate.euro 
+    ELSE obligo.max_obligo * currencies.exchange_rate * exchange_rate.mxn / exchange_rate.euro
+  END AS max_obligo_EUR,                     -- Customers.MaxObligoEUR
+  CASE  
+    WHEN customers.db_id IN ('palziv', 'foamot') THEN customers.zpal_bssh_ceiling * currencies.exchange_rate 
+    WHEN customers.db_id = 'pna' THEN customers.zpal_bssh_ceiling * currencies.exchange_rate * exchange_rate.usd 
+    WHEN customers.db_id = 'puk' THEN customers.zpal_bssh_ceiling * currencies.exchange_rate * exchange_rate.gbp
+    WHEN customers.db_id IN ('fomsrl', 'tropal') THEN customers.zpal_bssh_ceiling * currencies.exchange_rate * exchange_rate.ron
+    ELSE customers.zpal_bssh_ceiling * currencies.exchange_rate * exchange_rate.mxn
+  END AS bssh_ceiling_NIS,                   -- Customers.BsshCeilNIS
+  CASE  
+    WHEN customers.db_id IN ('palziv', 'foamot') THEN customers.zpal_bssh_ceiling * currencies.exchange_rate / exchange_rate.usd 
+    WHEN customers.db_id = 'pna' THEN customers.zpal_bssh_ceiling * currencies.exchange_rate 
+    WHEN customers.db_id = 'puk' THEN customers.zpal_bssh_ceiling * currencies.exchange_rate * exchange_rate.gbp / exchange_rate.usd 
+    WHEN customers.db_id IN ('fomsrl', 'tropal') THEN customers.zpal_bssh_ceiling * currencies.exchange_rate * exchange_rate.ron / exchange_rate.usd 
+    ELSE customers.zpal_bssh_ceiling * currencies.exchange_rate * exchange_rate.mxn / exchange_rate.usd
+  END AS bssh_ceiling_USD,                   -- Customers.BsshCeilUSD
+  CASE  
+    WHEN customers.db_id IN ('palziv', 'foamot') THEN customers.zpal_bssh_ceiling * currencies.exchange_rate / exchange_rate.gbp 
+    WHEN customers.db_id = 'pna' THEN customers.zpal_bssh_ceiling * currencies.exchange_rate * exchange_rate.usd / exchange_rate.gbp 
+    WHEN customers.db_id = 'puk' THEN customers.zpal_bssh_ceiling * currencies.exchange_rate 
+    WHEN customers.db_id IN ('fomsrl', 'tropal') THEN customers.zpal_bssh_ceiling * currencies.exchange_rate * exchange_rate.ron / exchange_rate.gbp 
+    ELSE customers.zpal_bssh_ceiling * currencies.exchange_rate * exchange_rate.mxn / exchange_rate.gbp
+  END AS bssh_ceiling_GBP,                   -- Customers.BsshCeilGBP
+  CASE  
+    WHEN customers.db_id IN ('palziv', 'foamot') THEN customers.zpal_bssh_ceiling * currencies.exchange_rate / exchange_rate.euro 
+    WHEN customers.db_id = 'pna' THEN customers.zpal_bssh_ceiling * currencies.exchange_rate * exchange_rate.usd / exchange_rate.euro 
+    WHEN customers.db_id = 'puk' THEN customers.zpal_bssh_ceiling * currencies.exchange_rate * exchange_rate.gbp / exchange_rate.euro 
+    WHEN customers.db_id IN ('fomsrl', 'tropal') THEN customers.zpal_bssh_ceiling * currencies.exchange_rate * exchange_rate.ron / exchange_rate.euro 
+    ELSE customers.zpal_bssh_ceiling * currencies.exchange_rate * exchange_rate.mxn / exchange_rate.euro
+  END AS bssh_ceiling_EUR,                   -- Customers.BsshCeilEUR
+  ---------------------------------------
+  customers.not_for_aging,                          -- AgingCustomers.NotForAging?
+  pay.terms_of_payment,                      -- AgingCustomers.PayDes
+  customers.zpal_bssh_notes,                        -- AgingCustomers.BsshNotes
+  customers.zpal_bssh_code,                         -- AgingCustomers.BsshCode
+FROM 
+  `palziv-data-prod.dwh.dwh_customers` AS customers
+LEFT JOIN
+  `palziv-data-prod.dwh.dwh_obligo` AS obligo ON customers.customer_db_id = obligo.obligo_db_id 
+LEFT JOIN 
+  `palziv-data-prod.dwh.dwh_pay` AS pay ON customers.pay_db_id = pay.pay_db_id 
+LEFT JOIN
+  `palziv-data-prod.dwh.dwh_currencies` AS currencies ON CONCAT(customers.db_id, '_', IF(obligo.currency_id <> 0, obligo.currency_id, customers.currency_id)) = currencies.currency_db_id 
+JOIN
+  `palziv-data-prod.modeling.modeling_dim_exchange_rate` AS exchange_rate ON true
+WHERE 
+  customers.db_id IN ('palziv', 'pna', 'foamot', 'puk', 'fomsrl', 'tropal','fommex','palmex')
+UNION ALL
+SELECT 
+  CONCAT(db_id, '_', customer_descripsion) AS customer_db_id,   -- CustomersToCustomerClassificationKey / SalesKeyTableToCustomersKey
+  CONCAT(db_id, '_', salesman) AS agent_db_id,                       
+  CONCAT(db_id, '_', customer_descripsion, '_', salesman) AS customer_agent_db_id,   -- SalesKeyTableToAgingAndObligoAndAgingCustomersKey
+  customer_descripsion AS customer_id,    -- AgingCustomers.Cust
+  db_id,                                  -- AgingCustomers.DB
+  salesman AS agent_id,                   -- AgingCustomers.Agent
+  NULL AS obligo_currency,                -- AgingCustomers.ObligoCurrency
+  NULL AS currency_code,                  -- AgingCustomers.ObligoCurrencyCode
+  NULL AS exchange_rate,                  -- AgingCustomers.ObligoExchangeRate
+  NULL AS max_obligo_NIS,                 -- Customers.MaxObligoNIS
+  NULL AS max_obligo_USD,                 -- Customers.MaxObligoUSD
+  NULL AS max_obligo_GBP,                 -- Customers.MaxObligoGBP
+  NULL AS max_obligo_EUR,                 -- Customers.MaxObligoEUR
+  NULL AS bssh_ceiling_NIS,               -- Customers.BsshCeilNIS
+  NULL AS bssh_ceiling_USD,               -- Customers.BsshCeilUSD
+  NULL AS bssh_ceiling_GBP,               -- Customers.BsshCeilGBP
+  NULL AS bssh_ceiling_EUR,               -- Customers.BsshCeilEUR
+  NULL AS not_for_aging,                  -- AgingCustomers.NotForAging?
+  NULL AS terms_of_payment,               -- AgingCustomers.PayDes
+  NULL AS zpal_bssh_notes,                -- AgingCustomers.BsshNotes
+  NULL zpal_bssh_code,                    -- AgingCustomers.BsshCode
+FROM pxl_invoices
+)

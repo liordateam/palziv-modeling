@@ -1,0 +1,18 @@
+config {
+  type: "view", 
+}
+
+CREATE VIEW `palziv-data-prod.modeling.modeling_dim_currencies` AS (
+WITH 
+currencies AS (
+  SELECT 'NIS' AS currency_id, 1 AS index
+  UNION ALL
+  SELECT 'USD', 2
+  UNION ALL
+  SELECT 'GBP', 3
+  UNION ALL
+  SELECT 'EUR', 4
+)
+
+SELECT * FROM currencies
+)
